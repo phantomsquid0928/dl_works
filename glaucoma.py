@@ -26,6 +26,8 @@ class GlaucomaDataset:
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
                 img = cv2.resize(img, self.output_size)  # Resize image
                 img = img.astype(np.float32) / 255.0  # Normalize image to [0, 1]
+                
+                img = np.transpose(img, (2, 0, 1))
                 self.images.append(img)
 
                 # If not in test split, load segmentation masks
