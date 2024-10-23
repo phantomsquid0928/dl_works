@@ -1,6 +1,6 @@
 import numpy as np
 from collections import OrderedDict
-from common.layers import Convolution, Relu, Pooling, Affine, SoftmaxWithLoss
+from common.layers import *
 import pickle
 import os
 
@@ -32,14 +32,15 @@ class SimpleGlaucomaCNN:
         self.layers['Relu2'] = Relu()
         self.layers['Affine2'] = Affine(self.params['W3'], self.params['b3'])
 
-        self.last_layer = SoftmaxWithLoss()
+        # self.last_layer = SoftmaxWithLoss()
+        self.last_layer = BCELoss()
 
     def predict(self, x):
         for layer in self.layers.values():
             x = layer.forward(x)
         return x
 
-    def loss(self, x, t):
+    def loss(self, x, t): # this thing must calculate bce loss 
         y = self.predict(x)
         return self.last_layer.forward(y, t)
 

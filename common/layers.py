@@ -282,3 +282,29 @@ class Pooling:
         dx = col2im(dcol, self.x.shape, self.pool_h, self.pool_w, self.stride, self.pad)
         
         return dx
+    
+## BCE binary cross entropy loss, may cause err
+
+class BCELoss:
+    """Binary Cross Entropy Loss with Sigmoid activation"""
+    
+    def __init__(self):
+        self.loss = None
+        self.y = None  # Output after sigmoid
+        self.t = None  # Ground truth labels
+
+    def forward(self, x, t):
+        """Forward pass to compute BCE loss"""
+        self.t = t
+        self.y = 1 / (1 + np.exp(-x))  # Sigmoid function
+        
+        # Compute binary cross-entropy loss
+        epsilon = 1e-7  # To avoid log(0)
+        self.loss = -np.mean(self.t * np.log(self.y + epsilon) + (1 - self.t) * np.log(1 - self.y + epsilon))
+        return self.loss
+
+    def backward(self, dout=1):
+        """Backward pass to compute gradients"""
+        batch_size = self.t.shape[0]
+        dx = (self.y - self.t) / batch_size  # Derivative of BCE
+        return dx
