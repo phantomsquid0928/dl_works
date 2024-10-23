@@ -44,12 +44,21 @@ class SimpleGlaucomaCNN:
         y = self.predict(x)
         return self.last_layer.forward(y, t)
 
+    # def accuracy(self, x, t):
+    #     y = self.predict(x)
+    #     y = np.argmax(y, axis=1)
+    #     if t.ndim != 1: t = np.argmax(t, axis=1)
+    #     accuracy = np.sum(y == t) / float(x.shape[0])
+    #     return accuracy
     def accuracy(self, x, t):
         y = self.predict(x)
-        y = np.argmax(y, axis=1)
-        if t.ndim != 1: t = np.argmax(t, axis=1)
-        accuracy = np.sum(y == t) / float(x.shape[0])
+        # Convert predictions to binary values (threshold at 0.5)
+        y = (y > 0.5).astype(np.int)
+        t = (t > 0.5).astype(np.int)  # Ensure t is also binary for comparison
+        # Compute pixel-wise accuracy
+        accuracy = np.mean(y == t)
         return accuracy
+
 
     def gradient(self, x, t):
         # Forward
