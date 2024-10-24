@@ -24,16 +24,16 @@ class SimpleConvNet:
     def __init__(self, input_dim=(1, 28, 28), 
                  conv_param={'filter_num':30, 'filter_size':5, 'pad':0, 'stride':1},
                  hidden_size=100, output_size=10, weight_init_std=0.01):
-        filter_num = conv_param['filter_num']
-        filter_size = conv_param['filter_size']
-        filter_pad = conv_param['pad']
-        filter_stride = conv_param['stride']
-        input_size = input_dim[1]
-        conv_output_size = (input_size - filter_size + 2*filter_pad) / filter_stride + 1
-        pool_output_size = int(filter_num * (conv_output_size/2) * (conv_output_size/2))
+        # filter_num = conv_param['filter_num']
+        # filter_size = conv_param['filter_size']
+        # filter_pad = conv_param['pad']
+        # filter_stride = conv_param['stride']
+        # input_size = input_dim[1]
+        # conv_output_size = (input_size - filter_size + 2*filter_pad) / filter_stride + 1
+        # pool_output_size = int(filter_num * (conv_output_size/2) * (conv_output_size/2))
 
-        conv_output_size2 = (pool_output_size - filter_size + 2 * filter_pad) / filter_stride + 1
-        pool_output_size2 = int(filter_num * (conv_output_size2 / 2) * (conv_output_size2 / 2))
+        # conv_output_size2 = (pool_output_size - filter_size + 2 * filter_pad) / filter_stride + 1
+        # pool_output_size2 = int(filter_num * (conv_output_size2 / 2) * (conv_output_size2 / 2))
         
         #new init of weights
         #filter_num = output size
@@ -49,7 +49,7 @@ class SimpleConvNet:
 
         for name, vals in self.conv_params.items(): 
             cur_conv_output_size = (input_size - vals['filter_size'] + 2 * vals['pad']) / vals['stride'] + 1
-            cur_pool_output_size = int(filter_num * (cur_conv_output_size / 2) * (cur_conv_output_size / 2))
+            cur_pool_output_size = int(channel_size * (cur_conv_output_size / 2) * (cur_conv_output_size / 2)) # all channels size
             self.params['W_' + name] = weight_init_std * \
                                         np.random.randn(vals['filter_num'], channel_size, vals['filter_size'], vals['filter_size'])
             self.params['b_' + name] = np.zeros(vals['filter_num'])
@@ -57,8 +57,9 @@ class SimpleConvNet:
             if name != 'out' :
                 self.params['gamma_' + name] = np.zeros(cur_conv_output_size)
                 self.params['beta_' + name] = np.zeros(cur_conv_output_size)
+                input_size = cur_pool_output_size / channel_size # 1 channel size
                 channel_size = vals['filter_num']
-                input_size = cur_pool_output_size
+                
         # self.params['outW'] = weight_init_std * np.random.randn(self.outconv['filter_num'], channel_size, self.outconv['filter_size'], self.outconv['filter_size'])
         # self.params['outb'] = np.zeros(self.outconv['filter_num'])
 
@@ -125,11 +126,16 @@ class SimpleConvNet:
         # self.last_layer = BCELoss()
 
     def predict(self, x):
-        for layer in self.layers.values():
+        for name, layer in self.layers.items():
             x = layer.forward(x)
-
+            print(f'name : {name}  shape: {x.shape}')
+            print(f'{x[:5]}')
         # return x
-        return Sigmoid(x)
+        x = Sigmoid(x)
+        print(f'res : {x.shape}')
+        print(f'{x[:5]}')
+        return x
+        #return Sigmoid(x)
 
     def loss(self, x, t):
         """손실 함수를 구한다.
