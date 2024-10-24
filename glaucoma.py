@@ -3,11 +3,12 @@ import cv2
 import numpy as np
 
 class GlaucomaDataset:
-    def __init__(self, root_dirs, split='train', output_size=(256, 256)):
+    def __init__(self, root_dirs, split='train', output_size=(256, 256), thresh = 0.6):
         self.output_size = output_size
         self.split = split
         self.images = []
         self.segs = []
+        self.vCDR_threshold = thresh
 
         # Load data from directories
         for direct in root_dirs:
