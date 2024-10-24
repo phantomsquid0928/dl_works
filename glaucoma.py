@@ -3,11 +3,12 @@ import cv2
 import numpy as np
 
 class GlaucomaDataset:
-    def __init__(self, root_dirs, split='train', output_size=(256, 256)):
+    def __init__(self, root_dirs, split='train', output_size=(256, 256), vCDR_threshold=0.6):
         self.output_size = output_size
         self.split = split
         self.images = []
-        self.segs = []
+        self.labels = []
+        self.vCDR_threshold = vCDR_threshold
 
         # Load data from directories
         for direct in root_dirs:
@@ -26,26 +27,24 @@ class GlaucomaDataset:
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
                 img = cv2.resize(img, self.output_size)  # Resize image
                 img = img.astype(np.float32) / 255.0  # Normalize image to [0, 1]
-                
-                img = np.transpose(img, (2, 0, 1))
                 self.images.append(img)
 
-                # If not in test split, load segmentation masks
                 if split != 'test':
+                    # Load segmentation masks
                     seg_name = os.path.join(direct, "Masks_Square", self.image_filenames[k][:-3] + "png")
                     mask = cv2.imread(seg_name, cv2.IMREAD_GRAYSCALE)  # Load mask as grayscale
                     od = (mask == 1).astype(np.float32)  # Optic disc mask
                     oc = (mask == 2).astype(np.float32)  # Optic cup mask
                     od = cv2.resize(od, self.output_size, interpolation=cv2.INTER_NEAREST)
                     oc = cv2.resize(oc, self.output_size, interpolation=cv2.INTER_NEAREST)
-                    # self.segs.append(np.stack([od, oc], axis=0))  # Stack the masks
 
+                    # Calculate vCDR (Vertical Cup-to-Disc Ratio)
                     vCDR = self.calculate_vCDR(od, oc)
 
                     # Assign binary label (1 if glaucoma, 0 if not)
                     label = 1 if vCDR > self.vCDR_threshold else 0
                     self.labels.append(label)
-                    
+
             print(f'Successfully loaded {split} dataset.')
 
     def calculate_vCDR(self, od, oc):
@@ -57,14 +56,11 @@ class GlaucomaDataset:
         # Calculate the vertical cup-to-disc ratio
         vCDR = oc_vertical_diameter / (od_vertical_diameter + 1e-7)  # Add a small value to avoid division by zero
         return vCDR
-    
+
     def __len__(self):
         return len(self.images)
 
     def __getitem__(self, idx):
         img = self.images[idx]
-        if self.split == 'test':
-            return img
-        else:
-            seg = self.segs[idx]
-            return img, seg
+        label = self.labels[idx] if self.split != 'test' else None
+        return img, label

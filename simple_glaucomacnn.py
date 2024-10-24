@@ -4,7 +4,7 @@ import pickle
 import numpy as np
 from collections import OrderedDict
 from common.layers import *
-from common.gradient import numerical_gradient
+# from common.gradient import numerical_gradient
 
 
 class SimpleConvNet:
@@ -88,28 +88,28 @@ class SimpleConvNet:
         
         return acc / x.shape[0]
 
-    def numerical_gradient(self, x, t):
-        """기울기를 구한다（수치미분）.
+    # def numerical_gradient(self, x, t):
+    #     """기울기를 구한다（수치미분）.
 
-        Parameters
-        ----------
-        x : 입력 데이터
-        t : 정답 레이블
+    #     Parameters
+    #     ----------
+    #     x : 입력 데이터
+    #     t : 정답 레이블
 
-        Returns
-        -------
-        각 층의 기울기를 담은 사전(dictionary) 변수
-            grads['W1']、grads['W2']、... 각 층의 가중치
-            grads['b1']、grads['b2']、... 각 층의 편향
-        """
-        loss_w = lambda w: self.loss(x, t)
+    #     Returns
+    #     -------
+    #     각 층의 기울기를 담은 사전(dictionary) 변수
+    #         grads['W1']、grads['W2']、... 각 층의 가중치
+    #         grads['b1']、grads['b2']、... 각 층의 편향
+    #     """
+    #     loss_w = lambda w: self.loss(x, t)
 
-        grads = {}
-        for idx in (1, 2, 3):
-            grads['W' + str(idx)] = numerical_gradient(loss_w, self.params['W' + str(idx)])
-            grads['b' + str(idx)] = numerical_gradient(loss_w, self.params['b' + str(idx)])
+    #     grads = {}
+    #     for idx in (1, 2, 3):
+    #         grads['W' + str(idx)] = numerical_gradient(loss_w, self.params['W' + str(idx)])
+    #         grads['b' + str(idx)] = numerical_gradient(loss_w, self.params['b' + str(idx)])
 
-        return grads
+    #     return grads
 
     def gradient(self, x, t):
         """기울기를 구한다(오차역전파법).
