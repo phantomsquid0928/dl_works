@@ -38,10 +38,26 @@ class GlaucomaDataset:
                     oc = (mask == 2).astype(np.float32)  # Optic cup mask
                     od = cv2.resize(od, self.output_size, interpolation=cv2.INTER_NEAREST)
                     oc = cv2.resize(oc, self.output_size, interpolation=cv2.INTER_NEAREST)
-                    self.segs.append(np.stack([od, oc], axis=0))  # Stack the masks
+                    # self.segs.append(np.stack([od, oc], axis=0))  # Stack the masks
 
+                    vCDR = self.calculate_vCDR(od, oc)
+
+                    # Assign binary label (1 if glaucoma, 0 if not)
+                    label = 1 if vCDR > self.vCDR_threshold else 0
+                    self.labels.append(label)
+                    
             print(f'Successfully loaded {split} dataset.')
 
+    def calculate_vCDR(self, od, oc):
+        """Calculate the vertical cup-to-disc ratio (vCDR) from the optic disc (od) and optic cup (oc) masks."""
+        # Find the vertical diameter (sum along the y-axis)
+        od_vertical_diameter = np.sum(od, axis=0).max()
+        oc_vertical_diameter = np.sum(oc, axis=0).max()
+
+        # Calculate the vertical cup-to-disc ratio
+        vCDR = oc_vertical_diameter / (od_vertical_diameter + 1e-7)  # Add a small value to avoid division by zero
+        return vCDR
+    
     def __len__(self):
         return len(self.images)
 
