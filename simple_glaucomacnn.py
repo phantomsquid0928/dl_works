@@ -46,10 +46,11 @@ class SimpleConvNet:
         input_size = input_dim[1]
 
         self.params = {}
-
+        #1 16 32 32 16
         for name, vals in self.conv_params.items(): 
+            weight_init_std = np.sqrt(2.0 / channel_size * vals['filter_size'] * vals['filter_size'])
             cur_conv_output_size = (input_size - vals['filter_size'] + 2 * vals['pad']) / vals['stride'] + 1
-            cur_pool_output_size = int(vals['filter_num'] * (cur_conv_output_size // 2) * (cur_conv_output_size // 2))
+            cur_pool_output_size = int(vals['filter_num'] * (cur_conv_output_size / 2) * (cur_conv_output_size / 2))
             self.params['W_' + name] = weight_init_std * \
                                         np.random.randn(vals['filter_num'], channel_size, vals['filter_size'], vals['filter_size'])
             self.params['b_' + name] = np.zeros(vals['filter_num'])
@@ -121,8 +122,8 @@ class SimpleConvNet:
         # self.layers['Relu2'] = Relu()
         # self.layers['Affine2'] = Affine(self.params['W4'], self.params['b4'])
 
-        self.last_layer = SoftmaxWithLoss()
-        # self.last_layer = BCELoss()
+        #self.last_layer = SoftmaxWithLoss()
+        self.last_layer = BCELoss()
 
     def predict(self, x):
         for layer in self.layers.values():
