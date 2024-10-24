@@ -38,9 +38,16 @@ class SimpleConvNet:
         self.params['W1'] = weight_init_std * \
                             np.random.randn(filter_num, input_dim[0], filter_size, filter_size)
         self.params['b1'] = np.zeros(filter_num)
+        
+        self.params['gamma1'] = np.zeros(conv_output_size)
+        self.params['beta1'] = np.zeros(conv_output_size)
+
+
         self.params['W2'] = weight_init_std * \
                             np.random.randn(pool_output_size, hidden_size)
         self.params['b2'] = np.zeros(hidden_size)
+
+        
 
         self.params['gamma2'] = np.zeros(hidden_size)
         self.params['beta2'] = np.zeros(hidden_size)
@@ -53,10 +60,13 @@ class SimpleConvNet:
         self.layers = OrderedDict()
         self.layers['Conv1'] = Convolution(self.params['W1'], self.params['b1'],
                                            conv_param['stride'], conv_param['pad'])
+        
+        self.layers['BatchNorm1'] = BatchNormalization(self.params['gamma1'], self.params['beta1'])
         self.layers['Relu1'] = Relu()
         self.layers['Pool1'] = Pooling(pool_h=2, pool_w=2, stride=2)
+        
         self.layers['Affine1'] = Affine(self.params['W2'], self.params['b2'])
-        self.layers['BatchNorm1'] = BatchNormalization(self.params['gamma2'], self.params['beta2'])
+        self.layers['BatchNorm2'] = BatchNormalization(self.params['gamma2'], self.params['beta2'])
         self.layers['Relu2'] = Relu()
         self.layers['Affine2'] = Affine(self.params['W3'], self.params['b3'])
 
