@@ -41,6 +41,10 @@ class SimpleConvNet:
         self.params['W2'] = weight_init_std * \
                             np.random.randn(pool_output_size, hidden_size)
         self.params['b2'] = np.zeros(hidden_size)
+
+        self.params['gamma2'] = np.zeros(hidden_size)
+        self.params['beta2'] = np.zeros(hidden_size)
+
         self.params['W3'] = weight_init_std * \
                             np.random.randn(hidden_size, output_size)
         self.params['b3'] = np.zeros(output_size)
@@ -52,6 +56,7 @@ class SimpleConvNet:
         self.layers['Relu1'] = Relu()
         self.layers['Pool1'] = Pooling(pool_h=2, pool_w=2, stride=2)
         self.layers['Affine1'] = Affine(self.params['W2'], self.params['b2'])
+        self.layers['BatchNorm1'] = BatchNormalization(self.params['gamma2'], self.params['beta2'])
         self.layers['Relu2'] = Relu()
         self.layers['Affine2'] = Affine(self.params['W3'], self.params['b3'])
 
