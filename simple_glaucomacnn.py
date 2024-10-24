@@ -6,7 +6,8 @@ from collections import OrderedDict
 from common.layers import *
 # from common.gradient import numerical_gradient
 
-
+class upconv:
+    def __init__(self, input_)
 class SimpleConvNet:
     """단순한 합성곱 신경망
     
@@ -35,6 +36,16 @@ class SimpleConvNet:
 
         conv_output_size2 = (pool_output_size - filter_size + 2 * filter_pad) / filter_stride + 1
         pool_output_size2 = int(filter_num * (conv_output_size2 / 2) * (conv_output_size2 / 2))
+        
+        # conv_params = {'convd1' : {'filter_num' : 16, 'filter_size' : 3, 'pad' : 1, 'stride' : 1},
+        #                'convd2' : {'filter_num' : 32, 'filter_size' : 3, 'pad' : 1, 'stride' : 1},
+        #                'convu3' : {'filter_num' : 32, 'filter_size' : 3, 'pad' : 1, 'stride' : 1},
+        #                'convu4' : {'filter_num' : 16, 'filter_size' : 3, 'pad' : 1, 'stride' : 1}}
+        # input_size = input_dim[1]
+        # for name, vals in conv_params.items(): 
+        #     self.params['W_' + name] = weight_init_std * \
+        #                                 np.random.randn(vals['filter_num'], )
+            
 
         # 가중치 초기화
         self.params = {}
@@ -46,7 +57,7 @@ class SimpleConvNet:
         self.params['beta1'] = np.zeros(conv_output_size)
 
         self.params['W2'] = weight_init_std * \
-                            np.random.randn(filter_num, pool_output_size, filter_size, filter_size)
+                            np.random.randn(filter_num, filter_num, filter_size, filter_size)
         self.params['b2'] = np.zeros(filter_num)
 
 
