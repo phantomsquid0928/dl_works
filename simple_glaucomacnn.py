@@ -33,6 +33,9 @@ class SimpleConvNet:
         conv_output_size = (input_size - filter_size + 2*filter_pad) / filter_stride + 1
         pool_output_size = int(filter_num * (conv_output_size/2) * (conv_output_size/2))
 
+        conv_output_size2 = (pool_output_size - filter_size + 2 * filter_pad) / filter_stride + 1
+        pool_output_size2 = int(filter_num * (conv_output_size2 / 2) * (conv_output_size2 / 2))
+
         # 가중치 초기화
         self.params = {}
         self.params['W1'] = weight_init_std * \
@@ -42,19 +45,25 @@ class SimpleConvNet:
         self.params['gamma1'] = np.zeros(conv_output_size)
         self.params['beta1'] = np.zeros(conv_output_size)
 
-
         self.params['W2'] = weight_init_std * \
-                            np.random.randn(pool_output_size, hidden_size)
-        self.params['b2'] = np.zeros(hidden_size)
+                            np.random.randn(filter_num, conv_output_size, filter_size, filter_size)
+        self.params['b2'] = np.zeros(filter_num)
+
+
+        self.params['gamma2'] = np.zeros(conv_output_size2)
+        self.params['beta2'] = np.zeros(conv_output_size2)
+
+        self.params['W3'] = weight_init_std * \
+                            np.random.randn(pool_output_size2, hidden_size)
+        self.params['b3'] = np.zeros(hidden_size)
 
         
 
-        self.params['gamma2'] = np.zeros(hidden_size)
-        self.params['beta2'] = np.zeros(hidden_size)
+        
 
-        self.params['W3'] = weight_init_std * \
+        self.params['W4'] = weight_init_std * \
                             np.random.randn(hidden_size, output_size)
-        self.params['b3'] = np.zeros(output_size)
+        self.params['b4'] = np.zeros(output_size)
 
         # 계층 생성
         self.layers = OrderedDict()
@@ -64,11 +73,17 @@ class SimpleConvNet:
         self.layers['BatchNorm1'] = BatchNormalization(self.params['gamma1'], self.params['beta1'])
         self.layers['Relu1'] = Relu()
         self.layers['Pool1'] = Pooling(pool_h=2, pool_w=2, stride=2)
-        
-        self.layers['Affine1'] = Affine(self.params['W2'], self.params['b2'])
+
+        self.layers['Conv2'] = Convolution(self.params['W2'], self.params['b2'], 
+                                           conv_param['stride'], conv_param['pad'])
         self.layers['BatchNorm2'] = BatchNormalization(self.params['gamma2'], self.params['beta2'])
         self.layers['Relu2'] = Relu()
-        self.layers['Affine2'] = Affine(self.params['W3'], self.params['b3'])
+        self.layers['Pool2'] = Pooling(pool_h = 2, pool_w = 2, stride = 2)
+
+        self.layers['Affine1'] = Affine(self.params['W3'], self.params['b3'])
+        
+        self.layers['Relu2'] = Relu()
+        self.layers['Affine2'] = Affine(self.params['W4'], self.params['b4'])
 
         self.last_layer = SoftmaxWithLoss()
 
