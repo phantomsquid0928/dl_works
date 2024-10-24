@@ -57,7 +57,7 @@ class SimpleConvNet:
             if name != 'out' :
                 self.params['gamma_' + name] = np.zeros(cur_conv_output_size)
                 self.params['beta_' + name] = np.zeros(cur_conv_output_size)
-                input_size = cur_pool_output_size / channel_size # 1 channel size
+                input_size = np.sqrt(cur_pool_output_size / channel_size) # 1 channel size
                 channel_size = vals['filter_num']
                 
         # self.params['outW'] = weight_init_std * np.random.randn(self.outconv['filter_num'], channel_size, self.outconv['filter_size'], self.outconv['filter_size'])
