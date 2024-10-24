@@ -46,7 +46,7 @@ class SimpleConvNet:
         self.params['beta1'] = np.zeros(conv_output_size)
 
         self.params['W2'] = weight_init_std * \
-                            np.random.randn(filter_num, conv_output_size, filter_size, filter_size)
+                            np.random.randn(filter_num, pool_output_size, filter_size, filter_size)
         self.params['b2'] = np.zeros(filter_num)
 
 
