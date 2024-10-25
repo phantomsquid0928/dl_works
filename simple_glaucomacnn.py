@@ -135,8 +135,8 @@ class SimpleConvNet:
         self.layers['Relu2'] = Relu()
         self.layers['Affine2'] = Affine(self.params['W4'], self.params['b4'])
 
-        # self.last_layer = SoftmaxWithLoss()
-        self.last_layer = BCELoss()
+        self.last_layer = SoftmaxWithLoss()
+        # self.last_layer = BCELoss()
 
     def predict(self, x):
         for name, layer in self.layers.items():
@@ -144,7 +144,7 @@ class SimpleConvNet:
             # print(f'name : {name}  shape: {x.shape}')
             # print(f'{x[:5]}')
         # return x
-        x = sigmoid(x)
+        x = softmax(x)
         # print(f'res : {x.shape}')
         # print(f'{x[:5]}')
         return x
