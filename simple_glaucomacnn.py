@@ -66,7 +66,7 @@ class SimpleConvNet:
                 
 
         self.params['W3'] = weight_init_std * \
-                            np.random.randn(channel_size * cur_conv_output_size * cur_conv_output_size, hidden_size)
+                            np.random.randn(int(channel_size * cur_conv_output_size * cur_conv_output_size), hidden_size)
         self.params['b3'] = np.zeros(hidden_size)
 
         self.params['W4'] = weight_init_std * \
@@ -171,20 +171,27 @@ class SimpleConvNet:
     #     vCDR = oc_vertical_diameter / (od_vertical_diameter + 1e-7)  # Add a small value to avoid division by zero
     #     return vCDR
     
-    def accuracy(self, x, t, batch_size=100):
-        if t.ndim != 1 : t = np.argmax(t, axis=1)
+    # def accuracy(self, x, t, batch_size=100):
+    #     if t.ndim != 1 : t = np.argmax(t, axis=1)
         
-        acc = 0.0
+    #     acc = 0.0
         
-        for i in range(int(x.shape[0] / batch_size)):
-            tx = x[i*batch_size:(i+1)*batch_size]
-            tt = t[i*batch_size:(i+1)*batch_size]
-            y = self.predict(tx)
+    #     for i in range(int(x.shape[0] / batch_size)):
+    #         tx = x[i*batch_size:(i+1)*batch_size]
+    #         tt = t[i*batch_size:(i+1)*batch_size]
+    #         y = self.predict(tx)
             
-            acc += softmax_loss(y, tt)
-           # acc += np.sum(y == tt) 
+    #         acc += softmax_loss(y, tt)
+    #        # acc += np.sum(y == tt) 
         
-        return acc / x.shape[0]
+    #     return acc / x.shape[0]
+    def accuracy(self, x, t):
+        y = self.predict(x)
+        y = (y > 0.5).astype(np.int)  # Convert predictions to binary (0 or 1)
+        t = (t > 0.5).astype(np.int)  # Ensure target is binary
+        accuracy = np.mean(y == t)  # Calculate accuracy
+        return accuracy
+
 
     # def numerical_gradient(self, x, t):
     #     """기울기를 구한다（수치미분）.
