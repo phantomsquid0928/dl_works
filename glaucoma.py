@@ -45,7 +45,7 @@ class GlaucomaDataset:
 
                     # Assign binary label (1 if glaucoma, 0 if not)
                     label = 1 if vCDR > self.vCDR_threshold else 0
-                    self.labels.append(label)
+                    self.segs.append(label)
                     
             print(f'Successfully loaded {split} dataset.')
 
