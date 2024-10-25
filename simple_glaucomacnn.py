@@ -40,8 +40,8 @@ class SimpleConvNet:
         self.conv_params = {'convd1' : {'filter_num' : 16, 'filter_size' : 3, 'pad' : 1, 'stride' : 1},
                        'convd2' : {'filter_num' : 32, 'filter_size' : 3, 'pad' : 1, 'stride' : 1},
                        'convu3' : {'filter_num' : 32, 'filter_size' : 3, 'pad' : 1, 'stride' : 1},
-                       'convu4' : {'filter_num' : 16, 'filter_size' : 3, 'pad' : 1, 'stride' : 1},
-                        'out' : {'filter_num' : output_size, 'filter_size' : 1, 'pad' : 0, 'stride' : 1}}
+                       'convu4' : {'filter_num' : 16, 'filter_size' : 3, 'pad' : 1, 'stride' : 1},}
+                        # 'out' : {'filter_num' : output_size, 'filter_size' : 1, 'pad' : 0, 'stride' : 1}}
         channel_size = input_dim[0]
         input_size = input_dim[1]
 
@@ -54,28 +54,41 @@ class SimpleConvNet:
                                         np.random.randn(vals['filter_num'], channel_size, vals['filter_size'], vals['filter_size'])
             self.params['b_' + name] = np.zeros(vals['filter_num'])
 
-            if name != 'out' :
-                self.params['gamma_' + name] = np.zeros(cur_conv_output_size)
-                self.params['beta_' + name] = np.zeros(cur_conv_output_size)
-                input_size = np.sqrt(cur_pool_output_size / channel_size) # 1 channel size
-                channel_size = vals['filter_num']
+            # if name != 'out' :
                 
+            input_size = np.sqrt(cur_pool_output_size / channel_size) # 1 channel size
+            channel_size = vals['filter_num']
+            self.params['gamma_' + name] = np.ones(channel_size)
+            self.params['beta_' + name] = np.zeros(channel_size)
+           
         # self.params['outW'] = weight_init_std * np.random.randn(self.outconv['filter_num'], channel_size, self.outconv['filter_size'], self.outconv['filter_size'])
         # self.params['outb'] = np.zeros(self.outconv['filter_num'])
 
+        self.params['W3'] = weight_init_std * \
+                            np.random.randn(cur_pool_output_size, hidden_size)
+        self.params['b3'] = np.zeros(hidden_size)
+
+        self.params['W4'] = weight_init_std * \
+                            np.random.randn(hidden_size, output_size)
+        self.params['b4'] = np.zeros(output_size)
 
         self.layers = OrderedDict()
 
         for name, vals in self.conv_params.items() :
             self.layers[name] = Convolution(self.params['W_' + name], self.params['b_' + name], vals['stride'], vals['pad'])
-            if name != 'out' :
-                self.layers['BatchNorm' + name] = BatchNormalization(self.params['gamma_' + name], self.params['beta_' + name])
-                self.layers['relu_' + name] = Relu()
-                self.layers['Pool_' + name] = Pooling(pool_h=2, pool_w=2, stride=2)
+            # if name != 'out' :
+            self.layers['BatchNorm' + name] = BatchNormalization(self.params['gamma_' + name], self.params['beta_' + name])
+            self.layers['relu_' + name] = Relu()
+            self.layers['Pool_' + name] = Pooling(pool_h=2, pool_w=2, stride=2)
         
         # self.layers['output'] = Convolution(self.params['outW'], self.params['outb'], outconv['stride'], outconv['pad'])
 
-            
+        self.layers['Affine1'] = Affine(self.params['W3'], self.params['b3'])
+        
+        self.layers['Relu2'] = Relu()
+        self.layers['Affine2'] = Affine(self.params['W4'], self.params['b4'])
+
+
 
         # 가중치 초기화
         # self.params = {}
@@ -122,8 +135,8 @@ class SimpleConvNet:
         # self.layers['Relu2'] = Relu()
         # self.layers['Affine2'] = Affine(self.params['W4'], self.params['b4'])
 
-        self.last_layer = SoftmaxWithLoss()
-        # self.last_layer = BCELoss()
+        # self.last_layer = SoftmaxWithLoss()
+        self.last_layer = BCELoss()
 
     def predict(self, x):
         for name, layer in self.layers.items():
@@ -131,7 +144,7 @@ class SimpleConvNet:
             print(f'name : {name}  shape: {x.shape}')
             print(f'{x[:5]}')
         # return x
-        x = Sigmoid(x)
+        x = sigmoid(x)
         print(f'res : {x.shape}')
         print(f'{x[:5]}')
         return x
@@ -159,19 +172,24 @@ class SimpleConvNet:
     #     return vCDR
     
     def accuracy(self, x, t, batch_size=100):
-        if t.ndim != 1 : t = np.argmax(t, axis=1)
+        # if t.ndim != 1 : t = np.argmax(t, axis=1)
         
-        acc = 0.0
+        # acc = 0.0
         
-        for i in range(int(x.shape[0] / batch_size)):
-            tx = x[i*batch_size:(i+1)*batch_size]
-            tt = t[i*batch_size:(i+1)*batch_size]
-            y = self.predict(tx)
+        # for i in range(int(x.shape[0] / batch_size)):
+        #     tx = x[i*batch_size:(i+1)*batch_size]
+        #     tt = t[i*batch_size:(i+1)*batch_size]
+        #     y = self.predict(tx)
             
-            acc += softmax_loss(y, tt)
-           # acc += np.sum(y == tt) 
+        #     acc += softmax_loss(y, tt)
+        #    # acc += np.sum(y == tt) 
         
-        return acc / x.shape[0]
+        # return acc / x.shape[0]
+        y = self.predict(x)
+        y = (y > 0.5).astype(np.int)  # Convert predictions to binary values (0 or 1)
+        t = (t > 0.5).astype(np.int)  # Convert ground truth to binary for comparison
+        accuracy = np.mean(y == t)  # This calculates the fraction of correct predictions over all samples
+        return accuracy
 
     # def numerical_gradient(self, x, t):
     #     """기울기를 구한다（수치미분）.
@@ -227,12 +245,12 @@ class SimpleConvNet:
 
         for name in self.conv_params.keys():
             grads['W_' + name], grads['b_' + name] = self.layers[name].dW, self.layers[name].db
-            if name != 'out' :
-                grads['gamma_' + name], grads['beta_' + name] = self.layers['BatchNorm' + name].dgamma, self.layers['BatchNorm' + name].dbeta
+            # if name != 'out' :
+            grads['gamma_' + name], grads['beta_' + name] = self.layers['BatchNorm' + name].dgamma, self.layers['BatchNorm' + name].dbeta
 
         # grads['W1'], grads['b1'] = self.layers['Conv1'].dW, self.layers['Conv1'].db
-        # grads['W2'], grads['b2'] = self.layers['Affine1'].dW, self.layers['Affine1'].db
-        # grads['W3'], grads['b3'] = self.layers['Affine2'].dW, self.layers['Affine2'].db
+        grads['W3'], grads['b3'] = self.layers['Affine1'].dW, self.layers['Affine1'].db
+        grads['W4'], grads['b4'] = self.layers['Affine2'].dW, self.layers['Affine2'].db
 
         return grads
         
