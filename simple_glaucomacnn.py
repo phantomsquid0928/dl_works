@@ -203,7 +203,7 @@ class SimpleConvNet:
     #     # Return accuracy as a fraction of correct predictions over total samples
     #     return accuracy_sum / len(x)
 
-    def accuracy(self, x, t, batch_size=100):
+    def accuracy(self, x, t, batch_size=50):
         correct_predictions = 0
         total_samples = 0
         
