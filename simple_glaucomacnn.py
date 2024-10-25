@@ -185,12 +185,24 @@ class SimpleConvNet:
     #        # acc += np.sum(y == tt) 
         
     #     return acc / x.shape[0]
-    def accuracy(self, x, t):
-        y = self.predict(x)
-        y = (y > 0.5).astype(np.int)  # Convert predictions to binary (0 or 1)
-        t = (t > 0.5).astype(np.int)  # Ensure target is binary
-        accuracy = np.mean(y == t)  # Calculate accuracy
-        return accuracy
+    def accuracy(self, x, t, batch_size=50):
+        accuracy_sum = 0.0
+        for i in range(0, len(x), batch_size):
+            # Get mini-batch
+            x_batch = x[i:i + batch_size]
+            t_batch = t[i:i + batch_size]
+
+            # Forward pass
+            y_batch = self.predict(x_batch)
+            y_batch = (y_batch > 0.5).astype(np.int)  # Convert predictions to binary (0 or 1)
+            t_batch = (t_batch > 0.5).astype(np.int)  # Ensure target is binary
+
+            # Compute accuracy for the batch
+            accuracy_sum += np.sum(y_batch == t_batch)
+
+        # Return accuracy as a fraction of correct predictions over total samples
+        return accuracy_sum / len(x)
+
 
 
     # def numerical_gradient(self, x, t):
