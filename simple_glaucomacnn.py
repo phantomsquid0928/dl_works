@@ -185,23 +185,38 @@ class SimpleConvNet:
     #        # acc += np.sum(y == tt) 
         
     #     return acc / x.shape[0]
-    def accuracy(self, x, t, batch_size=50):
-        accuracy_sum = 0.0
-        for i in range(0, len(x), batch_size):
-            # Get mini-batch
-            x_batch = x[i:i + batch_size]
-            t_batch = t[i:i + batch_size]
+    # def accuracy(self, x, t, batch_size=50):
+    #     accuracy_sum = 0.0
+    #     for i in range(0, len(x), batch_size):
+    #         # Get mini-batch
+    #         x_batch = x[i:i + batch_size]
+    #         t_batch = t[i:i + batch_size]
 
-            # Forward pass
-            y_batch = self.predict(x_batch)
-            y_batch = (y_batch > 0.5).astype(np.int)  # Convert predictions to binary (0 or 1)
-            t_batch = (t_batch > 0.5).astype(np.int)  # Ensure target is binary
+    #         # Forward pass
+    #         y_batch = self.predict(x_batch)
+    #         y_batch = (y_batch > 0.5).astype(np.int)  # Convert predictions to binary (0 or 1)
+    #         t_batch = (t_batch > 0.5).astype(np.int)  # Ensure target is binary
 
-            # Compute accuracy for the batch
-            accuracy_sum += np.sum(y_batch == t_batch)
+    #         # Compute accuracy for the batch
+    #         accuracy_sum += np.sum(y_batch == t_batch)
 
-        # Return accuracy as a fraction of correct predictions over total samples
-        return accuracy_sum / len(x)
+    #     # Return accuracy as a fraction of correct predictions over total samples
+    #     return accuracy_sum / len(x)
+
+    def accuracy(self, x, t, batch_size=100):
+        y = self.predict(x)  # Get the network's output
+
+        # Convert 'y' to predicted class by taking the argmax (highest value in the output)
+        y = np.argmax(y, axis=1)  # y will be the predicted class index (0 or 1)
+        
+        # Convert 't' (target) from one-hot encoded to class index by taking argmax
+        t = np.argmax(t, axis=1)  # t will be the true class index (0 or 1)
+        
+        # Calculate accuracy
+        accuracy = np.mean(y == t)  # Compare predicted vs true labels
+        
+        return accuracy
+
 
 
 
