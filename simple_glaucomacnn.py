@@ -56,12 +56,22 @@ class SimpleConvNet:
                                         np.random.randn(vals['filter_num'], channel_size, vals['filter_size'], vals['filter_size'])
             self.params['b_' + name] = np.zeros(vals['filter_num'])
 
+            channel_size = vals['filter_num']
+            input_size = cur_pool_output_size
             if name != 'out' :
-                channel_size = vals['filter_num']
+                
                 self.params['gamma_' + name] = np.ones(int(channel_size * cur_conv_output_size * cur_conv_output_size))
                 self.params['beta_' + name] = np.zeros(int(channel_size * cur_conv_output_size * cur_conv_output_size))
                 #channel_size = vals['filter_num']
-                input_size = cur_pool_output_size
+                
+
+        self.params['W3'] = weight_init_std * \
+                            np.random.randn(channel_size * cur_conv_output_size * cur_conv_output_size, hidden_size)
+        self.params['b3'] = np.zeros(hidden_size)
+
+        self.params['W4'] = weight_init_std * \
+                            np.random.randn(hidden_size, output_size)
+        self.params['b4'] = np.zeros(output_size)
                 
         # self.params['outW'] = weight_init_std * np.random.randn(self.outconv['filter_num'], channel_size, self.outconv['filter_size'], self.outconv['filter_size'])
         # self.params['outb'] = np.zeros(self.outconv['filter_num'])
@@ -120,13 +130,13 @@ class SimpleConvNet:
         # self.layers['Relu2'] = Relu()
         # self.layers['Pool2'] = Pooling(pool_h = 2, pool_w = 2, stride = 2)
 
-        # self.layers['Affine1'] = Affine(self.params['W3'], self.params['b3'])
+        self.layers['Affine1'] = Affine(self.params['W3'], self.params['b3'])
         
-        # self.layers['Relu2'] = Relu()
-        # self.layers['Affine2'] = Affine(self.params['W4'], self.params['b4'])
+        self.layers['Relu2'] = Relu()
+        self.layers['Affine2'] = Affine(self.params['W4'], self.params['b4'])
 
-        self.last_layer = SoftmaxWithLoss()
-        # self.last_layer = BCELoss()
+        # self.last_layer = SoftmaxWithLoss()
+        self.last_layer = BCELoss()
 
     def predict(self, x):
         for name, layer in self.layers.items():
@@ -134,7 +144,7 @@ class SimpleConvNet:
             # print(f'name : {name}  shape: {x.shape}')
             # print(f'{x[:5]}')
         # return x
-        # x = Sigmoid(x)
+        x = sigmoid(x)
         # print(f'res : {x.shape}')
         # print(f'{x[:5]}')
         return x
@@ -234,8 +244,8 @@ class SimpleConvNet:
                 grads['gamma_' + name], grads['beta_' + name] = self.layers['BatchNorm' + name].dgamma, self.layers['BatchNorm' + name].dbeta
 
         # grads['W1'], grads['b1'] = self.layers['Conv1'].dW, self.layers['Conv1'].db
-        # grads['W2'], grads['b2'] = self.layers['Affine1'].dW, self.layers['Affine1'].db
-        # grads['W3'], grads['b3'] = self.layers['Affine2'].dW, self.layers['Affine2'].db
+        grads['W3'], grads['b3'] = self.layers['Affine1'].dW, self.layers['Affine1'].db
+        grads['W4'], grads['b4'] = self.layers['Affine2'].dW, self.layers['Affine2'].db
 
         return grads
         
