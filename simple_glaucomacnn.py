@@ -204,17 +204,28 @@ class SimpleConvNet:
     #     return accuracy_sum / len(x)
 
     def accuracy(self, x, t, batch_size=100):
-        y = self.predict(x)  # Get the network's output
-
-        # Convert 'y' to predicted class by taking the argmax (highest value in the output)
-        y = np.argmax(y, axis=1)  # y will be the predicted class index (0 or 1)
+        correct_predictions = 0
+        total_samples = 0
         
-        # Convert 't' (target) from one-hot encoded to class index by taking argmax
-        t = np.argmax(t, axis=1)  # t will be the true class index (0 or 1)
+        for i in range(0, len(x), batch_size):
+            x_batch = x[i:i + batch_size]
+            t_batch = t[i:i + batch_size]
+            
+            # Predict the output for the batch
+            y_batch = self.predict(x_batch)
+            
+            # Convert 'y_batch' to predicted class by taking the argmax (highest value in the output)
+            y_pred = np.argmax(y_batch, axis=1)  # y_pred will be the predicted class index (0 or 1)
+            
+            # Convert 't_batch' (target) from one-hot encoded to class index by taking argmax
+            t_true = np.argmax(t_batch, axis=1)  # t_true will be the true class index (0 or 1)
+            
+            # Count correct predictions
+            correct_predictions += np.sum(y_pred == t_true)
+            total_samples += len(t_batch)
         
-        # Calculate accuracy
-        accuracy = np.mean(y == t)  # Compare predicted vs true labels
-        
+        # Calculate and return accuracy
+        accuracy = correct_predictions / total_samples
         return accuracy
 
 
