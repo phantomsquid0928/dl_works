@@ -1,312 +1,385 @@
-import sys, os
-sys.path.append(os.pardir)  # 부모 디렉터리의 파일을 가져올 수 있도록 설정
-import pickle
 import numpy as np
 from collections import OrderedDict
 from common.layers import *
-# from common.gradient import numerical_gradient
+import pickle
+
+class BatchNormWrapper:
+    def __init__(self, batch_norm_layer):
+        self.batch_norm_layer = batch_norm_layer
+
+    def forward(self, x):
+        if x.ndim == 4:
+            N, C, H, W = x.shape
+            x_flat = x.transpose(0, 2, 3, 1).reshape(-1, C)
+            x_flat = self.batch_norm_layer.forward(x_flat)
+            x = x_flat.reshape(N, H, W, C).transpose(0, 3, 1, 2)
+            return x
+        else:
+            return self.batch_norm_layer.forward(x)
+
+    def backward(self, dout):
+        if dout.ndim == 4:
+            N, C, H, W = dout.shape
+            dout_flat = dout.transpose(0, 2, 3, 1).reshape(-1, C)
+            dout_flat = self.batch_norm_layer.backward(dout_flat)
+            dout = dout_flat.reshape(N, H, W, C).transpose(0, 3, 1, 2)
+            return dout
+        else:
+            return self.batch_norm_layer.backward(dout)
+
+class Upsample:
+    def __init__(self, scale_factor=2):
+        self.scale_factor = scale_factor
+
+    def forward(self, x):
+        return np.repeat(np.repeat(x, self.scale_factor, axis=2), self.scale_factor, axis=3)
+
+    def backward(self, dout):
+        N, C, H, W = dout.shape
+        return dout[:, :, ::self.scale_factor, ::self.scale_factor]
+
+class Concat:
+    """Concatenate two inputs along the channel axis."""
+    def forward(self, x1, x2):
+        self.x1_shape = x1.shape
+        self.x2_shape = x2.shape
+        return np.concatenate([x2, x1], axis=1)
+
+    def backward(self, dout):
+        dout_x1 = dout[:, self.x2_shape[1]:, :, :]  # Gradient for x1 (original input)
+        dout_x2 = dout[:, :self.x2_shape[1], :, :]  # Gradient for x2 (upsampled input)
+        return dout_x1, dout_x2
+
+class DoubleConv:
+    def __init__(self, W1, b1, W2, b2, stride=1, pad=1):
+        self.conv1 = Convolution(W1, b1, stride=stride, pad=pad)
+        self.bn1 = BatchNormWrapper(BatchNormalization(np.ones(W1.shape[0]), np.zeros(W1.shape[0])))
+        self.relu1 = Relu()
+        self.conv2 = Convolution(W2, b2, stride=stride, pad=pad)
+        self.bn2 = BatchNormWrapper(BatchNormalization(np.ones(W2.shape[0]), np.zeros(W2.shape[0])))
+        self.relu2 = Relu()
+
+    def forward(self, x):
+        x = self.conv1.forward(x)
+        x = self.bn1.forward(x)
+        x = self.relu1.forward(x)
+        x = self.conv2.forward(x)
+        x = self.bn2.forward(x)
+        x = self.relu2.forward(x)
+        return x
+
+    def backward(self, dout):
+        dout = self.relu2.backward(dout)
+        dout = self.bn2.backward(dout)
+        dout = self.conv2.backward(dout)
+        dout = self.relu1.backward(dout)
+        dout = self.bn1.backward(dout)
+        dout = self.conv1.backward(dout)
+        return dout
+
+    @property
+    def dW1(self):
+        return self.conv1.dW
+
+    @property
+    def db1(self):
+        return self.conv1.db
+
+    @property
+    def dW2(self):
+        return self.conv2.dW
+
+    @property
+    def db2(self):
+        return self.conv2.db
+
+    @property
+    def dgamma1(self):
+        return self.bn1.dgamma
+
+    @property
+    def dbeta1(self):
+        return self.bn1.dbeta
+
+    @property
+    def dgamma2(self):
+        return self.bn2.dgamma
+
+    @property
+    def dbeta2(self):
+        return self.bn2.dbeta
+
+class Down:
+    """Double Conv followed by Max Pooling for downsampling."""
+    def __init__(self, W1, b1, W2, b2, stride=1, pad=1):
+        self.double_conv = DoubleConv(W1, b1, W2, b2, stride, pad)
+        self.pool = Pooling(pool_h=2, pool_w=2, stride=2)
+        # self.saved_dout = None  # Initialize saved dout for gradient accumulation
+
+    def forward(self, x):
+        conv = self.double_conv.forward(x)
+        x = self.pool.forward(conv)  # Apply max pooling after the double conv
+        return x, conv
+
+    def backward(self, dout, dout2):
+        # if add and self.saved_dout is not None:
+        #     print(f'saved shape {self.save_dout.shape}')
+        #     print(f'dout shape {dout.shape}')
+        #     # If add=True, sum the current dout and saved_dout element-wise
+        #     dout += self.saved_dout  # Element-wise addition, dimensions must match
+        dout = self.pool.backward(dout)  # Max pooling's backward
+        dout += dout2
+        dout = self.double_conv.backward(dout)  # Backprop through double conv
+        return dout
+
+    # def save_dout(self, dout):
+    #     # Save dout for future gradient accumulation, ensure it's saved correctly
+    #     self.saved_dout = dout
+
+    # Access gradients for backpropagation
+    @property
+    def dW1(self):
+        return self.double_conv.dW1
+
+    @property
+    def db1(self):
+        return self.double_conv.db1
+
+    @property
+    def dW2(self):
+        return self.double_conv.dW2
+
+    @property
+    def db2(self):
+        return self.double_conv.db2
+
+    @property
+    def dgamma1(self):
+        return self.double_conv.dgamma1
+
+    @property
+    def dbeta1(self):
+        return self.double_conv.dbeta1
+
+    @property
+    def dgamma2(self):
+        return self.double_conv.dgamma2
+
+    @property
+    def dbeta2(self):
+        return self.double_conv.dbeta2
+
+
+class Up:
+    """Upsample followed by concatenation and Double Conv."""
+    def __init__(self, W1, b1, W2, b2, stride=1, pad=1):
+        self.up = Upsample(scale_factor=2)
+        self.concat = Concat()
+        self.double_conv = DoubleConv(W1, b1, W2, b2, stride, pad)
+        self.x2 = False
+    def forward(self, x1, x2=None):
+        x1 = self.up.forward(x1)
+        if x2 is not None:
+            # print(f'before concat size x1 x2 - x1 : {x1.shape} ,  x2 :  {x2.shape}')
+            x1 = self.concat.forward(x1, x2)
+            self.x2 = True
+        return self.double_conv.forward(x1)
+
+    def backward(self, dout):
+        dout = self.double_conv.backward(dout)
+        if self.x2 is True:
+            dout_x1, dout_x2 = self.concat.backward(dout)
+            dout_x1 = self.up.backward(dout_x1)
+            # print(f'shape dout_x1{dout_x1.shape}')
+            # print(f'shape dout_x2{dout_x2.shape}')
+            return dout_x1, dout_x2
+        return dout
+
+    @property
+    def dW1(self):
+        return self.double_conv.dW1
+
+    @property
+    def db1(self):
+        return self.double_conv.db1
+
+    @property
+    def dW2(self):
+        return self.double_conv.dW2
+
+    @property
+    def db2(self):
+        return self.double_conv.db2
+
+    @property
+    def dgamma1(self):
+        return self.double_conv.dgamma1
+
+    @property
+    def dbeta1(self):
+        return self.double_conv.dbeta1
+
+    @property
+    def dgamma2(self):
+        return self.double_conv.dgamma2
+
+    @property
+    def dbeta2(self):
+        return self.double_conv.dbeta2
 
 class SimpleConvNet:
-    """단순한 합성곱 신경망
-    
-    conv - relu - pool - affine - relu - affine - softmax
-    
-    Parameters
-    ----------
-    input_size : 입력 크기（MNIST의 경우엔 784）
-    hidden_size_list : 각 은닉층의 뉴런 수를 담은 리스트（e.g. [100, 100, 100]）
-    output_size : 출력 크기（MNIST의 경우엔 10）
-    activation : 활성화 함수 - 'relu' 혹은 'sigmoid'
-    weight_init_std : 가중치의 표준편차 지정（e.g. 0.01）
-        'relu'나 'he'로 지정하면 'He 초깃값'으로 설정
-        'sigmoid'나 'xavier'로 지정하면 'Xavier 초깃값'으로 설정
-    """
-    def __init__(self, input_dim=(1, 28, 28), 
-                 conv_param={'filter_num':30, 'filter_size':5, 'pad':0, 'stride':1},
-                 hidden_size=100, output_size=10, weight_init_std=0.01):
-        # filter_num = conv_param['filter_num']
-        # filter_size = conv_param['filter_size']
-        # filter_pad = conv_param['pad']
-        # filter_stride = conv_param['stride']
-        # input_size = input_dim[1]
-        # conv_output_size = (input_size - filter_size + 2*filter_pad) / filter_stride + 1
-        # pool_output_size = int(filter_num * (conv_output_size/2) * (conv_output_size/2))
-
-        # conv_output_size2 = (pool_output_size - filter_size + 2 * filter_pad) / filter_stride + 1
-        # pool_output_size2 = int(filter_num * (conv_output_size2 / 2) * (conv_output_size2 / 2))
-        
-        #new init of weights
-        #filter_num = output size
-        self.conv_params = {'convd1' : {'filter_num' : 16, 'filter_size' : 3, 'pad' : 1, 'stride' : 1},
-                       'convd2' : {'filter_num' : 32, 'filter_size' : 3, 'pad' : 1, 'stride' : 1},
-                       'convu3' : {'filter_num' : 32, 'filter_size' : 3, 'pad' : 1, 'stride' : 1},
-                       'convu4' : {'filter_num' : 16, 'filter_size' : 3, 'pad' : 1, 'stride' : 1},
-                        'out' : {'filter_num' : output_size, 'filter_size' : 1, 'pad' : 0, 'stride' : 1}}
-        channel_size = input_dim[0]
-        input_size = input_dim[1]
-
+    def __init__(self, input_dim=(3, 256, 256), output_size=2, weight_init_std=0.01):
+        self.conv_params = {
+            'convd1': {'filter_in': input_dim[0], 'filter_out' : 16, 'filter_size': 3, 'pad': 1, 'stride': 1},
+            'convd2': {'filter_in': 16, 'filter_out' : 32,'filter_size': 3, 'pad': 1, 'stride': 1},
+            'conv3': {'filter_in': 32, 'filter_out' : 64,'filter_size': 3, 'pad': 1, 'stride': 1},
+            'convu1': {'filter_in': 96, 'filter_out' : 48,'filter_size': 3, 'pad': 1, 'stride': 1},
+            'convu2': {'filter_in': 64, 'filter_out' : 32,'filter_size': 3, 'pad': 1, 'stride': 1},
+            'out': {'filter_in': 32, 'filter_out' : output_size, 'filter_size': 1, 'pad': 0, 'stride': 1}
+        }
         self.params = {}
-        # channel : 3 16 32 32 16
-        #input : 256 
-        for name, vals in self.conv_params.items(): 
-            cur_conv_output_size = (input_size - vals['filter_size'] + 2 * vals['pad']) / vals['stride'] + 1
-            # cur_pool_output_size = int(channel_size * (cur_conv_output_size / 2) * (cur_conv_output_size / 2))
-            cur_pool_output_size = int(cur_conv_output_size / 2)
-            self.params['W_' + name] = weight_init_std * \
-                                        np.random.randn(vals['filter_num'], channel_size, vals['filter_size'], vals['filter_size'])
-            self.params['b_' + name] = np.zeros(vals['filter_num'])
-
-            channel_size = vals['filter_num']
-            input_size = cur_pool_output_size
-            if name != 'out' :
-                
-                self.params['gamma_' + name] = np.ones(int(channel_size * cur_conv_output_size * cur_conv_output_size))
-                self.params['beta_' + name] = np.zeros(int(channel_size * cur_conv_output_size * cur_conv_output_size))
-                #channel_size = vals['filter_num']
-                
-
-        self.params['W3'] = weight_init_std * \
-                            np.random.randn(int(channel_size * cur_conv_output_size * cur_conv_output_size), hidden_size)
-        self.params['b3'] = np.zeros(hidden_size)
-
-        self.params['W4'] = weight_init_std * \
-                            np.random.randn(hidden_size, output_size)
-        self.params['b4'] = np.zeros(output_size)
-                
-        # self.params['outW'] = weight_init_std * np.random.randn(self.outconv['filter_num'], channel_size, self.outconv['filter_size'], self.outconv['filter_size'])
-        # self.params['outb'] = np.zeros(self.outconv['filter_num'])
-
-
         self.layers = OrderedDict()
 
-        for name, vals in self.conv_params.items() :
-            self.layers[name] = Convolution(self.params['W_' + name], self.params['b_' + name], vals['stride'], vals['pad'])
-            if name != 'out' :
-                self.layers['BatchNorm' + name] = BatchNormalization(self.params['gamma_' + name], self.params['beta_' + name])
-                self.layers['relu_' + name] = Relu()
-                self.layers['Pool_' + name] = Pooling(pool_h=2, pool_w=2, stride=2)
-        
-        # self.layers['output'] = Convolution(self.params['outW'], self.params['outb'], outconv['stride'], outconv['pad'])
+        input_size = input_dim[1]
 
-            
+        for name, vals in self.conv_params.items():
+            cur_conv_output_size = (input_size - vals['filter_size'] + 2 * vals['pad']) / vals['stride'] + 1
+            cur_pool_output_size = int(cur_conv_output_size / 2)
 
-        # 가중치 초기화
-        # self.params = {}
-        # self.params['W1'] = weight_init_std * \
-        #                     np.random.randn(filter_num, input_dim[0], filter_size, filter_size)
-        # self.params['b1'] = np.zeros(filter_num)
-        
-        # self.params['gamma1'] = np.zeros(conv_output_size)
-        # self.params['beta1'] = np.zeros(conv_output_size)
+            if name == 'out':
+                # Only single convolution for output
+                W = weight_init_std * np.random.randn(vals['filter_out'], vals['filter_in'], vals['filter_size'], vals['filter_size'])
+                b = np.zeros(vals['filter_out'])
+                self.params[f'W_{name}'] = W
+                self.params[f'b_{name}'] = b
+                self.layers[name] = Convolution(W, b, vals['stride'], vals['pad'])
+            else:
+                W1 = weight_init_std * np.random.randn(vals['filter_out'], vals['filter_in'], vals['filter_size'], vals['filter_size'])
+                W2 = weight_init_std * np.random.randn(vals['filter_out'], vals['filter_out'], vals['filter_size'], vals['filter_size'])
+                b1 = np.zeros(vals['filter_out'])
+                b2 = np.zeros(vals['filter_out'])
 
-        # self.params['W2'] = weight_init_std * \
-        #                     np.random.randn(filter_num, filter_num, filter_size, filter_size)
-        # self.params['b2'] = np.zeros(filter_num)
+                self.params[f'W1_{name}'] = W1
+                self.params[f'b1_{name}'] = b1
+                self.params[f'W2_{name}'] = W2
+                self.params[f'b2_{name}'] = b2
+
+                if 'convd' in name:
+                    self.layers[name] = Down(W1, b1, W2, b2)
+                elif 'convu' in name:
+                    self.layers[name] = Up(W1, b1, W2, b2)
+                elif 'conv' in name:
+                    self.layers[name] = DoubleConv(W1, b1, W2, b2)
+
+            input_size = cur_pool_output_size
 
 
-        # self.params['gamma2'] = np.zeros(conv_output_size2)
-        # self.params['beta2'] = np.zeros(conv_output_size2)
+        self.last_layer = BCELoss()
 
-        # self.params['W3'] = weight_init_std * \
-        #                     np.random.randn(pool_output_size2, hidden_size)
-        # self.params['b3'] = np.zeros(hidden_size)
+    def forward(self, x):
+        enc1, cres1 = self.layers['convd1'].forward(x)
+        # print(f'convd1 res shape : {enc1.shape}   - saved shape : {cres1.shape}')
+        enc2, cres2 = self.layers['convd2'].forward(enc1)
+        # print(f'convd2 res shape : {enc2.shape}     - saved shape : {cres2.shape}')
+        enc3 = self.layers['conv3'].forward(enc2)
+        # print(f'conv3 res shape : {enc3.shape}')
 
-        # self.params['W4'] = weight_init_std * \
-        #                     np.random.randn(hidden_size, output_size)
-        # self.params['b4'] = np.zeros(output_size)
+        dec1 = self.layers['convu1'].forward(enc3, cres2)
+        # print(f'convu1 res shape : {dec1.shape}')
+        dec2 = self.layers['convu2'].forward(dec1, cres1)
+        # print(f'convu2 res shape : {dec2.shape}')
 
-        # 계층 생성
-        # self.layers = OrderedDict()
-        # self.layers['Conv1'] = Convolution(self.params['W1'], self.params['b1'],
-        #                                    conv_param['stride'], conv_param['pad'])
-        
-        # self.layers['BatchNorm1'] = BatchNormalization(self.params['gamma1'], self.params['beta1'])
-        # self.layers['Relu1'] = Relu()
-        # self.layers['Pool1'] = Pooling(pool_h=2, pool_w=2, stride=2)
-
-        # self.layers['Conv2'] = Convolution(self.params['W2'], self.params['b2'], 
-        #                                    conv_param['stride'], conv_param['pad'])
-        # self.layers['BatchNorm2'] = BatchNormalization(self.params['gamma2'], self.params['beta2'])
-        # self.layers['Relu2'] = Relu()
-        # self.layers['Pool2'] = Pooling(pool_h = 2, pool_w = 2, stride = 2)
-
-        self.layers['Affine1'] = Affine(self.params['W3'], self.params['b3'])
-        
-        self.layers['Relu2'] = Relu()
-        self.layers['Affine2'] = Affine(self.params['W4'], self.params['b4'])
-
-        self.last_layer = SoftmaxWithLoss()
-        # self.last_layer = BCELoss()
+        out = self.layers['out'].forward(dec2)
+        # print(f'out res shape : {out.shape}')
+        return sigmoid(out)
 
     def predict(self, x):
-        for name, layer in self.layers.items():
-            x = layer.forward(x)
-            # print(f'name : {name}  shape: {x.shape}')
-            # print(f'{x[:5]}')
-        # return x
-        x = softmax(x)
-        # print(f'res : {x.shape}')
-        # print(f'{x[:5]}')
-        return x
-        #return Sigmoid(x)
+        return self.forward(x)
 
     def loss(self, x, t):
-        """손실 함수를 구한다.
-
-        Parameters
-        ----------
-        x : 입력 데이터
-        t : 정답 레이블
-        """
         y = self.predict(x)
         return self.last_layer.forward(y, t)
-    
-    # def calculate_vCDR(self, od, oc):
-    #     """Calculate the vertical cup-to-disc ratio (vCDR) from the optic disc (od) and optic cup (oc) masks."""
-    #     # Find the vertical diameter (sum along the y-axis)
-    #     od_vertical_diameter = np.sum(od, axis=0).max()
-    #     oc_vertical_diameter = np.sum(oc, axis=0).max()
 
-    #     # Calculate the vertical cup-to-disc ratio
-    #     vCDR = oc_vertical_diameter / (od_vertical_diameter + 1e-7)  # Add a small value to avoid division by zero
-    #     return vCDR
-    
-    # def accuracy(self, x, t, batch_size=100):
-    #     if t.ndim != 1 : t = np.argmax(t, axis=1)
-        
-    #     acc = 0.0
-        
-    #     for i in range(int(x.shape[0] / batch_size)):
-    #         tx = x[i*batch_size:(i+1)*batch_size]
-    #         tt = t[i*batch_size:(i+1)*batch_size]
-    #         y = self.predict(tx)
-            
-    #         acc += softmax_loss(y, tt)
-    #        # acc += np.sum(y == tt) 
-        
-    #     return acc / x.shape[0]
-    # def accuracy(self, x, t, batch_size=50):
-    #     accuracy_sum = 0.0
-    #     for i in range(0, len(x), batch_size):
-    #         # Get mini-batch
-    #         x_batch = x[i:i + batch_size]
-    #         t_batch = t[i:i + batch_size]
+    def accuracy(self, x, t, batch_size=20):
+      total_correct = 0
+      total_samples = 0
 
-    #         # Forward pass
-    #         y_batch = self.predict(x_batch)
-    #         y_batch = (y_batch > 0.5).astype(np.int)  # Convert predictions to binary (0 or 1)
-    #         t_batch = (t_batch > 0.5).astype(np.int)  # Ensure target is binary
+      # Loop through data in batches
+      for i in range(0, x.shape[0], batch_size):
+          x_batch = x[i:i+batch_size]
+          t_batch = t[i:i+batch_size]
+          
+          # Get predictions for the batch
+          y_batch = self.predict(x_batch)
+          
+          # Threshold to get binary predictions
+          y_bin = (y_batch > 0.5).astype(np.float32)
+          t_bin = t_batch.astype(np.float32)
 
-    #         # Compute accuracy for the batch
-    #         accuracy_sum += np.sum(y_batch == t_batch)
+          # Calculate correct predictions for the batch
+          correct = np.sum((y_bin == t_bin))
+          total_correct += correct
+          total_samples += t_batch.size
 
-    #     # Return accuracy as a fraction of correct predictions over total samples
-    #     return accuracy_sum / len(x)
+      # Calculate overall accuracy
+      accuracy = total_correct / total_samples
+      return accuracy
 
-    def accuracy(self, x, t, batch_size=50):
-        correct_predictions = 0
-        total_samples = 0
-        
-        for i in range(0, len(x), batch_size):
-            x_batch = x[i:i + batch_size]
-            t_batch = t[i:i + batch_size]
-            
-            # Predict the output for the batch
-            y_batch = self.predict(x_batch)
-            
-            # Convert 'y_batch' to predicted class by taking the argmax (highest value in the output)
-            y_pred = np.argmax(y_batch, axis=1)  # y_pred will be the predicted class index (0 or 1)
-            
-            # Convert 't_batch' (target) from one-hot encoded to class index by taking argmax
-            t_true = np.argmax(t_batch, axis=1)  # t_true will be the true class index (0 or 1)
-            
-            # Count correct predictions
-            correct_predictions += np.sum(y_pred == t_true)
-            total_samples += len(t_batch)
-        
-        # Calculate and return accuracy
-        accuracy = correct_predictions / total_samples
-        return accuracy
-
-
-
-
-    # def numerical_gradient(self, x, t):
-    #     """기울기를 구한다（수치미분）.
-
-    #     Parameters
-    #     ----------
-    #     x : 입력 데이터
-    #     t : 정답 레이블
-
-    #     Returns
-    #     -------
-    #     각 층의 기울기를 담은 사전(dictionary) 변수
-    #         grads['W1']、grads['W2']、... 각 층의 가중치
-    #         grads['b1']、grads['b2']、... 각 층의 편향
-    #     """
-    #     loss_w = lambda w: self.loss(x, t)
-
-    #     grads = {}
-    #     for idx in (1, 2, 3):
-    #         grads['W' + str(idx)] = numerical_gradient(loss_w, self.params['W' + str(idx)])
-    #         grads['b' + str(idx)] = numerical_gradient(loss_w, self.params['b' + str(idx)])
-
-    #     return grads
 
     def gradient(self, x, t):
-        """기울기를 구한다(오차역전파법).
+      """Compute the gradient using backpropagation."""
+      # Forward pass to calculate the loss
+      self.loss(x, t)
+      dout = self.last_layer.backward(1)
 
-        Parameters
-        ----------
-        x : 입력 데이터
-        t : 정답 레이블
+      # Reverse the layers for backward propagation
+      # rlayers = sorted(self.layers., reverse = True)
+      
+      reverselayer = ['out', 'convu2', 'convu1', 'conv3', 'convd2', 'convd1']
+      # print(f'sorted res : {reverselayer}')
+      saved_douts = {}  # To store saved gradients for concatenation
 
-        Returns
-        -------
-        각 층의 기울기를 담은 사전(dictionary) 변수
-            grads['W1']、grads['W2']、... 각 층의 가중치
-            grads['b1']、grads['b2']、... 각 층의 편향
-        """
-        # forward
-        self.loss(x, t)
+      # Backward pass through all layers
 
-        # backward
-        dout = 1
-        dout = self.last_layer.backward(dout)
+      layermap = {'convd2' : 'convu1', 'convd1' : 'convu2' }
+      for name in reverselayer:
+          layer = self.layers[name]
+          # print(f'shape of dout {dout.shape}')
+          # print(f'back proping : {name} layer...')
+          # print()
+          # If the layer is an Up layer with concatenation
+          if isinstance(layer, Up):
+              # Perform the backward pass with concatenation
+              dout, dout_x2 = layer.backward(dout)
+              # Save dout_x2 for the corresponding Down layer
+              saved_douts[name] = dout_x2
+          elif isinstance(layer, Down):
+              # If it's a Down layer and it has saved dout from a concatenated Up layer
+              dout = layer.backward(dout, saved_douts[layermap[name]])  # Combine the saved dout with the current dout
 
-        layers = list(self.layers.values())
-        layers.reverse()
-        for layer in layers:
-            dout = layer.backward(dout)
+          else:
+              # Regular backward for other layers
+              dout = layer.backward(dout)
 
-        # 결과 저장
-        grads = {}
+      # Collect gradients
+      grads = {}
+      for name, layer in self.layers.items():
+        if isinstance(layer, (Down, Up, DoubleConv)):
+            # Collect gradients for layers with DoubleConv (including Down, Up, and DoubleConv itself)
+          grads[f'W1_{name}'] = layer.dW1
+          grads[f'b1_{name}'] = layer.db1
+          grads[f'W2_{name}'] = layer.dW2
+          grads[f'b2_{name}'] = layer.db2
+          if hasattr(layer, 'dgamma1'):
+              grads[f'gamma1_{name}'] = layer.dgamma1
+              grads[f'beta1_{name}'] = layer.dbeta1
+          if hasattr(layer, 'dgamma2'):
+              grads[f'gamma2_{name}'] = layer.dgamma2
+              grads[f'beta2_{name}'] = layer.dbeta2
+        elif isinstance(layer, Convolution):
+          # Collect gradients for individual Convolution layers
+          grads[f'W_{name}'] = layer.dW
+          grads[f'b_{name}'] = layer.db
 
-        for name in self.conv_params.keys():
-            grads['W_' + name], grads['b_' + name] = self.layers[name].dW, self.layers[name].db
-            if name != 'out' :
-                grads['gamma_' + name], grads['beta_' + name] = self.layers['BatchNorm' + name].dgamma, self.layers['BatchNorm' + name].dbeta
 
-        # grads['W1'], grads['b1'] = self.layers['Conv1'].dW, self.layers['Conv1'].db
-        grads['W3'], grads['b3'] = self.layers['Affine1'].dW, self.layers['Affine1'].db
-        grads['W4'], grads['b4'] = self.layers['Affine2'].dW, self.layers['Affine2'].db
-
-        return grads
-        
-    def save_params(self, file_name="params.pkl"):
-        params = {}
-        for key, val in self.params.items():
-            params[key] = val
-        with open(file_name, 'wb') as f:
-            pickle.dump(params, f)
-
-    def load_params(self, file_name="params.pkl"):
-        with open(file_name, 'rb') as f:
-            params = pickle.load(f)
-        for key, val in params.items():
-            self.params[key] = val
-
-        for i, key in enumerate(['Conv1', 'Affine1', 'Affine2']):
-            self.layers[key].W = self.params['W' + str(i+1)]
-            self.layers[key].b = self.params['b' + str(i+1)]
+      return grads

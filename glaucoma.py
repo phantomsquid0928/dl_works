@@ -39,17 +39,17 @@ class GlaucomaDataset:
                     oc = (mask == 2).astype(np.float32)  # Optic cup mask
                     od = cv2.resize(od, self.output_size, interpolation=cv2.INTER_NEAREST)
                     oc = cv2.resize(oc, self.output_size, interpolation=cv2.INTER_NEAREST)
-                    # self.segs.append(np.stack([od, oc], axis=0))  # Stack the masks
+                    self.segs.append(np.stack([od, oc], axis=0))  # Stack the masks
 
-                    vCDR = self.calculate_vCDR(od, oc)
+                    # vCDR = self.calculate_vCDR(od, oc)
 
                     # Assign binary label (1 if glaucoma, 0 if not)
-                    label = 1 if vCDR > self.vCDR_threshold else 0
+                    # label = 1 if vCDR > self.vCDR_threshold else 0
 
-                    one_hot_label = np.zeros(2)
-                    one_hot_label[label] = 1
+                    # one_hot_label = np.zeros(2)
+                    # one_hot_label[label] = 1
 
-                    self.segs.append(one_hot_label)
+                    # self.segs.append(one_hot_label)
 
                     # self.segs.append(label)
                     
