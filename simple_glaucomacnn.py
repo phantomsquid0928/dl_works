@@ -300,30 +300,34 @@ class SimpleConvNet:
         y = self.predict(x)
         return self.last_layer.forward(y, t)
 
-    def accuracy(self, x, t, batch_size=20):
-      total_correct = 0
-      total_samples = 0
+    def accuracy(self, x, t, batch_size=100):
+        total_iou = 0
+        total_batches = 0
 
-      # Loop through data in batches
-      for i in range(0, x.shape[0], batch_size):
-          x_batch = x[i:i+batch_size]
-          t_batch = t[i:i+batch_size]
-          
-          # Get predictions for the batch
-          y_batch = self.predict(x_batch)
-          
-          # Threshold to get binary predictions
-          y_bin = (y_batch > 0.5).astype(np.float32)
-          t_bin = t_batch.astype(np.float32)
+        for i in range(0, x.shape[0], batch_size):
+            print(f'acc assess {i}...')
+            x_batch = x[i:i+batch_size]
+            t_batch = t[i:i+batch_size]
 
-          # Calculate correct predictions for the batch
-          correct = np.sum((y_bin == t_bin))
-          total_correct += correct
-          total_samples += t_batch.size
+            # Get predictions for the batch
+            y_batch = self.predict(x_batch)
 
-      # Calculate overall accuracy
-      accuracy = total_correct / total_samples
-      return accuracy
+            # Threshold to get binary predictions (0 or 1)
+            y_bin = (y_batch > 0.5).astype(np.float32)
+            t_bin = t_batch.astype(np.float32)
+
+            # Calculate IoU for the batch
+            intersection = np.sum((y_bin == 1) & (t_bin == 1))  # True positives
+            union = np.sum((y_bin == 1) | (t_bin == 1))         # True positives + False positives + False negatives
+
+            iou = intersection / (union + 1e-7)  # Adding a small epsilon to avoid division by zero
+            total_iou += iou
+            total_batches += 1
+
+        # Return average IoU over all batches
+        avg_iou = total_iou / total_batches
+        return avg_iou
+
 
 
     def gradient(self, x, t):
