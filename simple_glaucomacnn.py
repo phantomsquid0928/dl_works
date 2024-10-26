@@ -46,32 +46,32 @@ class Concat:
         return np.concatenate([x2, x1], axis=1)
 
     def backward(self, dout):
-        dout_x1 = dout[:, self.x2_shape[1]:, :, :]  # Gradient for x1 (original input)
-        dout_x2 = dout[:, :self.x2_shape[1], :, :]  # Gradient for x2 (upsampled input)
+        dout_x1 = dout[:, self.x2_shape[1]:, :, :]  # grad for x1 (original input)
+        dout_x2 = dout[:, :self.x2_shape[1], :, :]  # grad for x2 (upsampled input)
         return dout_x1, dout_x2
 
-class DoubleConv:
-    def __init__(self, W1, b1, W2, b2, stride=1, pad=1):
+class DoubleConv: #now will do only 1 as we need lighter one
+    def __init__(self, W1, b1, stride=1, pad=1):
         self.conv1 = Convolution(W1, b1, stride=stride, pad=pad)
         self.bn1 = BatchNormWrapper(BatchNormalization(np.ones(W1.shape[0]), np.zeros(W1.shape[0])))
         self.relu1 = Relu()
-        self.conv2 = Convolution(W2, b2, stride=stride, pad=pad)
-        self.bn2 = BatchNormWrapper(BatchNormalization(np.ones(W2.shape[0]), np.zeros(W2.shape[0])))
-        self.relu2 = Relu()
+        # self.conv2 = Convolution(W2, b2, stride=stride, pad=pad)
+        # self.bn2 = BatchNormWrapper(BatchNormalization(np.ones(W2.shape[0]), np.zeros(W2.shape[0])))
+        # self.relu2 = Relu()
 
     def forward(self, x):
         x = self.conv1.forward(x)
         x = self.bn1.forward(x)
         x = self.relu1.forward(x)
-        x = self.conv2.forward(x)
-        x = self.bn2.forward(x)
-        x = self.relu2.forward(x)
+        # x = self.conv2.forward(x)
+        # x = self.bn2.forward(x)
+        # x = self.relu2.forward(x)
         return x
 
     def backward(self, dout):
-        dout = self.relu2.backward(dout)
-        dout = self.bn2.backward(dout)
-        dout = self.conv2.backward(dout)
+        # dout = self.relu2.backward(dout)
+        # dout = self.bn2.backward(dout)
+        # dout = self.conv2.backward(dout)
         dout = self.relu1.backward(dout)
         dout = self.bn1.backward(dout)
         dout = self.conv1.backward(dout)
@@ -85,13 +85,13 @@ class DoubleConv:
     def db1(self):
         return self.conv1.db
 
-    @property
-    def dW2(self):
-        return self.conv2.dW
+    # @property
+    # def dW2(self):
+    #     return self.conv2.dW
 
-    @property
-    def db2(self):
-        return self.conv2.db
+    # @property
+    # def db2(self):
+    #     return self.conv2.db
 
     @property
     def dgamma1(self):
@@ -101,18 +101,18 @@ class DoubleConv:
     def dbeta1(self):
         return self.bn1.dbeta
 
-    @property
-    def dgamma2(self):
-        return self.bn2.dgamma
+    # @property
+    # def dgamma2(self):
+    #     return self.bn2.dgamma
 
-    @property
-    def dbeta2(self):
-        return self.bn2.dbeta
+    # @property
+    # def dbeta2(self):
+    #     return self.bn2.dbeta
 
 class Down:
     """Double Conv followed by Max Pooling for downsampling."""
-    def __init__(self, W1, b1, W2, b2, stride=1, pad=1):
-        self.double_conv = DoubleConv(W1, b1, W2, b2, stride, pad)
+    def __init__(self, W1, b1, stride=1, pad=1):
+        self.double_conv = DoubleConv(W1, b1, stride, pad)
         self.pool = Pooling(pool_h=2, pool_w=2, stride=2)
         # self.saved_dout = None  # Initialize saved dout for gradient accumulation
 
@@ -145,13 +145,13 @@ class Down:
     def db1(self):
         return self.double_conv.db1
 
-    @property
-    def dW2(self):
-        return self.double_conv.dW2
+    # @property
+    # def dW2(self):
+    #     return self.double_conv.dW2
 
-    @property
-    def db2(self):
-        return self.double_conv.db2
+    # @property
+    # def db2(self):
+    #     return self.double_conv.db2
 
     @property
     def dgamma1(self):
@@ -161,21 +161,21 @@ class Down:
     def dbeta1(self):
         return self.double_conv.dbeta1
 
-    @property
-    def dgamma2(self):
-        return self.double_conv.dgamma2
+    # @property
+    # def dgamma2(self):
+    #     return self.double_conv.dgamma2
 
-    @property
-    def dbeta2(self):
-        return self.double_conv.dbeta2
+    # @property
+    # def dbeta2(self):
+    #     return self.double_conv.dbeta2
 
 
 class Up:
     """Upsample followed by concatenation and Double Conv."""
-    def __init__(self, W1, b1, W2, b2, stride=1, pad=1):
+    def __init__(self, W1, b1, stride=1, pad=1):
         self.up = Upsample(scale_factor=2)
         self.concat = Concat()
-        self.double_conv = DoubleConv(W1, b1, W2, b2, stride, pad)
+        self.double_conv = DoubleConv(W1, b1, stride, pad)
         self.x2 = False
     def forward(self, x1, x2=None):
         x1 = self.up.forward(x1)
@@ -203,13 +203,13 @@ class Up:
     def db1(self):
         return self.double_conv.db1
 
-    @property
-    def dW2(self):
-        return self.double_conv.dW2
+    # @property
+    # def dW2(self):
+    #     return self.double_conv.dW2
 
-    @property
-    def db2(self):
-        return self.double_conv.db2
+    # @property
+    # def db2(self):
+    #     return self.double_conv.db2
 
     @property
     def dgamma1(self):
@@ -219,13 +219,13 @@ class Up:
     def dbeta1(self):
         return self.double_conv.dbeta1
 
-    @property
-    def dgamma2(self):
-        return self.double_conv.dgamma2
+    # @property
+    # def dgamma2(self):
+    #     return self.double_conv.dgamma2
 
-    @property
-    def dbeta2(self):
-        return self.double_conv.dbeta2
+    # @property
+    # def dbeta2(self):
+    #     return self.double_conv.dbeta2
 
 class SimpleConvNet:
     def __init__(self, input_dim=(3, 256, 256), output_size=2, weight_init_std=0.01):
@@ -255,21 +255,21 @@ class SimpleConvNet:
                 self.layers[name] = Convolution(W, b, vals['stride'], vals['pad'])
             else:
                 W1 = weight_init_std * np.random.randn(vals['filter_out'], vals['filter_in'], vals['filter_size'], vals['filter_size'])
-                W2 = weight_init_std * np.random.randn(vals['filter_out'], vals['filter_out'], vals['filter_size'], vals['filter_size'])
+                # W2 = weight_init_std * np.random.randn(vals['filter_out'], vals['filter_out'], vals['filter_size'], vals['filter_size'])
                 b1 = np.zeros(vals['filter_out'])
-                b2 = np.zeros(vals['filter_out'])
+                # b2 = np.zeros(vals['filter_out'])
 
                 self.params[f'W1_{name}'] = W1
                 self.params[f'b1_{name}'] = b1
-                self.params[f'W2_{name}'] = W2
-                self.params[f'b2_{name}'] = b2
+                # self.params[f'W2_{name}'] = W2
+                # self.params[f'b2_{name}'] = b2
 
                 if 'convd' in name:
-                    self.layers[name] = Down(W1, b1, W2, b2)
+                    self.layers[name] = Down(W1, b1)
                 elif 'convu' in name:
-                    self.layers[name] = Up(W1, b1, W2, b2)
+                    self.layers[name] = Up(W1, b1)
                 elif 'conv' in name:
-                    self.layers[name] = DoubleConv(W1, b1, W2, b2)
+                    self.layers[name] = DoubleConv(W1, b1)
 
             input_size = cur_pool_output_size
 
@@ -372,14 +372,14 @@ class SimpleConvNet:
             # Collect gradients for layers with DoubleConv (including Down, Up, and DoubleConv itself)
           grads[f'W1_{name}'] = layer.dW1
           grads[f'b1_{name}'] = layer.db1
-          grads[f'W2_{name}'] = layer.dW2
-          grads[f'b2_{name}'] = layer.db2
+        #   grads[f'W2_{name}'] = layer.dW2
+        #   grads[f'b2_{name}'] = layer.db2
           if hasattr(layer, 'dgamma1'):
               grads[f'gamma1_{name}'] = layer.dgamma1
               grads[f'beta1_{name}'] = layer.dbeta1
-          if hasattr(layer, 'dgamma2'):
-              grads[f'gamma2_{name}'] = layer.dgamma2
-              grads[f'beta2_{name}'] = layer.dbeta2
+        #   if hasattr(layer, 'dgamma2'):
+        #       grads[f'gamma2_{name}'] = layer.dgamma2
+        #       grads[f'beta2_{name}'] = layer.dbeta2
         elif isinstance(layer, Convolution):
           # Collect gradients for individual Convolution layers
           grads[f'W_{name}'] = layer.dW
