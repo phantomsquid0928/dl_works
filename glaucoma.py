@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 
 class GlaucomaDataset:
-    def __init__(self, root_dirs, split='train', output_size=(256, 256), thresh = 0.6):
+    def __init__(self, root_dirs, split='train', output_size=(128, 128), thresh=0.6):  # Changed default output_size to (128, 128)
         self.output_size = output_size
         self.split = split
         self.images = []
@@ -25,10 +25,10 @@ class GlaucomaDataset:
                 img_name = os.path.join(direct, "Images_Square", self.image_filenames[k])
                 img = cv2.imread(img_name)  # Read image
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
-                img = cv2.resize(img, self.output_size)  # Resize image
+                img = cv2.resize(img, self.output_size)  # Resize image to half the size
                 img = img.astype(np.float32) / 255.0  # Normalize image to [0, 1]
                 
-                img = np.transpose(img, (2, 0, 1))
+                img = np.transpose(img, (2, 0, 1))  # Change to channel-first format (C, H, W)
                 self.images.append(img)
 
                 # If not in test split, load segmentation masks
@@ -37,21 +37,9 @@ class GlaucomaDataset:
                     mask = cv2.imread(seg_name, cv2.IMREAD_GRAYSCALE)  # Load mask as grayscale
                     od = (mask == 1).astype(np.float32)  # Optic disc mask
                     oc = (mask == 2).astype(np.float32)  # Optic cup mask
-                    od = cv2.resize(od, self.output_size, interpolation=cv2.INTER_NEAREST)
-                    oc = cv2.resize(oc, self.output_size, interpolation=cv2.INTER_NEAREST)
+                    od = cv2.resize(od, self.output_size, interpolation=cv2.INTER_NEAREST)  # Resize to half the size
+                    oc = cv2.resize(oc, self.output_size, interpolation=cv2.INTER_NEAREST)  # Resize to half the size
                     self.segs.append(np.stack([od, oc], axis=0))  # Stack the masks
-
-                    # vCDR = self.calculate_vCDR(od, oc)
-
-                    # Assign binary label (1 if glaucoma, 0 if not)
-                    # label = 1 if vCDR > self.vCDR_threshold else 0
-
-                    # one_hot_label = np.zeros(2)
-                    # one_hot_label[label] = 1
-
-                    # self.segs.append(one_hot_label)
-
-                    # self.segs.append(label)
                     
             print(f'Successfully loaded {split} dataset.')
 
