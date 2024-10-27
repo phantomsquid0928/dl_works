@@ -273,10 +273,12 @@ class SimpleConvNet:
         self.conv_params = {
             'convd1': {'filter_in': input_dim[0], 'filter_out' : 16, 'filter_size': 3, 'pad': 1, 'stride': 1},
             'convd2': {'filter_in': 16, 'filter_out' : 32,'filter_size': 3, 'pad': 1, 'stride': 1},
-            'conv3': {'filter_in': 32, 'filter_out' : 64,'filter_size': 3, 'pad': 1, 'stride': 1},
-            'convu1': {'filter_in': 96, 'filter_out' : 48,'filter_size': 3, 'pad': 1, 'stride': 1},
-            'convu2': {'filter_in': 64, 'filter_out' : 32,'filter_size': 3, 'pad': 1, 'stride': 1},
-            'out': {'filter_in': 32, 'filter_out' : output_size, 'filter_size': 1, 'pad': 0, 'stride': 1}
+            'convd3': {'filter_in': 32, 'filter_out' : 64,'filter_size': 3, 'pad': 1, 'stride': 1},
+            'conv4': {'filter_in': 64, 'filter_out' : 128,'filter_size': 3, 'pad': 1, 'stride': 1},
+            'convu1': {'filter_in': 192, 'filter_out' : 96,'filter_size': 3, 'pad': 1, 'stride': 1},
+            'convu2': {'filter_in': 128, 'filter_out' : 64,'filter_size': 3, 'pad': 1, 'stride': 1},
+            'convu3': {'filter_in': 80, 'filter_out' : 40,'filter_size': 3, 'pad': 1, 'stride': 1},
+            'out': {'filter_in': 40, 'filter_out' : output_size, 'filter_size': 1, 'pad': 0, 'stride': 1}
         }
         self.params = {}
         self.layers = OrderedDict()
@@ -339,22 +341,30 @@ class SimpleConvNet:
         del(enc1)
         np.get_default_memory_pool().free_all_blocks()
         # print(f'convd2 res shape : {enc2.shape}     - saved shape : {cres2.shape}')
-        enc3 = self.layers['conv3'].forward(enc2)
+        enc3, cres3 = self.layers['convd3'].forward(enc2)
         del(enc2)
         np.get_default_memory_pool().free_all_blocks()
-        # print(f'conv3 res shape : {enc3.shape}')
 
-        dec1 = self.layers['convu1'].forward(enc3, cres2)
-        del(enc3, cres2)
+        enc4 = self.layers['conv4'].forward(enc3)
+        del(enc3)
+        np.get_default_memory_pool().free_all_blocks()
+        # print(f'conv4 res shape : {enc3.shape}')
+
+        dec1 = self.layers['convu1'].forward(enc4, cres3)
+        del(enc3, cres3)
+        np.get_default_memory_pool().free_all_blocks()
+
+        dec2 = self.layers['convu2'].forward(dec1, cres2)
+        del(dec1, cres2)
         np.get_default_memory_pool().free_all_blocks()
         # print(f'convu1 res shape : {dec1.shape}')
-        dec2 = self.layers['convu2'].forward(dec1, cres1)
-        del(dec1, cres1)
+        dec3 = self.layers['convu3'].forward(dec2, cres1)
+        del(dec2, cres1)
         np.get_default_memory_pool().free_all_blocks()
         # print(f'convu2 res shape : {dec2.shape}')
 
-        out = self.layers['out'].forward(dec2)
-        del(dec2)
+        out = self.layers['out'].forward(dec3)
+        del(dec3)
         np.get_default_memory_pool().free_all_blocks()
         # print(f'out res shape : {out.shape}')
         return sigmoid(out)
@@ -406,13 +416,13 @@ class SimpleConvNet:
       # Reverse the layers for backward propagation
       # rlayers = sorted(self.layers., reverse = True)
       
-      reverselayer = ['out', 'convu2', 'convu1', 'conv3', 'convd2', 'convd1']
+      reverselayer = ['out', 'convu3', 'convu2', 'convu1', 'conv4', 'convd3', 'convd2', 'convd1']
       # print(f'sorted res : {reverselayer}')
       saved_douts = {}  # To store saved gradients for concatenation
 
       # Backward pass through all layers
 
-      layermap = {'convd2' : 'convu1', 'convd1' : 'convu2' }
+      layermap = {'convd3' : 'convu1', 'convd2' : 'convu2', 'convd1' : 'convu3' }
       for name in reverselayer:
           layer = self.layers[name]
           # print(f'shape of dout {dout.shape}')
