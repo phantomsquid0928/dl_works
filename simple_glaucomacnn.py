@@ -48,6 +48,8 @@ class Concat:
     def backward(self, dout):
         dout_x1 = dout[:, self.x2_shape[1]:, :, :]  # Gradient for x1 (original input)
         dout_x2 = dout[:, :self.x2_shape[1], :, :]  # Gradient for x2 (upsampled input)
+        del(dout)
+        np.get_default_memory_pool().free_all_blocks()
         return dout_x1, dout_x2
 
 class DoubleConv:
@@ -60,21 +62,45 @@ class DoubleConv:
         self.relu2 = Relu()
 
     def forward(self, x):
-        x = self.conv1.forward(x)
-        x = self.bn1.forward(x)
-        x = self.relu1.forward(x)
-        x = self.conv2.forward(x)
-        x = self.bn2.forward(x)
-        x = self.relu2.forward(x)
+        x1 = self.conv1.forward(x)
+        del(x)
+        np.get_default_memory_pool().free_all_blocks()
+        x = self.bn1.forward(x1)
+        del(x1)
+        np.get_default_memory_pool().free_all_blocks()
+        x1 = self.relu1.forward(x)
+        del(x)
+        np.get_default_memory_pool().free_all_blocks()
+        x = self.conv2.forward(x1)
+        del(x1)
+        np.get_default_memory_pool().free_all_blocks()
+        x1 = self.bn2.forward(x)
+        del(x)
+        np.get_default_memory_pool().free_all_blocks()
+        x = self.relu2.forward(x1)
+        del(x1)
+        np.get_default_memory_pool().free_all_blocks()
         return x
 
     def backward(self, dout):
-        dout = self.relu2.backward(dout)
-        dout = self.bn2.backward(dout)
-        dout = self.conv2.backward(dout)
-        dout = self.relu1.backward(dout)
-        dout = self.bn1.backward(dout)
-        dout = self.conv1.backward(dout)
+        dout1 = self.relu2.backward(dout)
+        del(dout)
+        np.get_default_memory_pool().free_all_blocks()
+        dout = self.bn2.backward(dout1)
+        del(dout1)
+        np.get_default_memory_pool().free_all_blocks()
+        dout1 = self.conv2.backward(dout)
+        del(dout)
+        np.get_default_memory_pool().free_all_blocks()
+        dout = self.relu1.backward(dout1)
+        del(dout1)
+        np.get_default_memory_pool().free_all_blocks()
+        dout1 = self.bn1.backward(dout)
+        del(dout)
+        np.get_default_memory_pool().free_all_blocks()
+        dout = self.conv1.backward(dout1)
+        del(dout1)
+        np.get_default_memory_pool().free_all_blocks()
         return dout
 
     @property
@@ -278,18 +304,24 @@ class SimpleConvNet:
 
     def forward(self, x):
         enc1, cres1 = self.layers['convd1'].forward(x)
+        np.get_default_memory_pool().free_all_blocks()
         # print(f'convd1 res shape : {enc1.shape}   - saved shape : {cres1.shape}')
         enc2, cres2 = self.layers['convd2'].forward(enc1)
+        np.get_default_memory_pool().free_all_blocks()
         # print(f'convd2 res shape : {enc2.shape}     - saved shape : {cres2.shape}')
         enc3 = self.layers['conv3'].forward(enc2)
+        np.get_default_memory_pool().free_all_blocks()
         # print(f'conv3 res shape : {enc3.shape}')
 
         dec1 = self.layers['convu1'].forward(enc3, cres2)
+        np.get_default_memory_pool().free_all_blocks()
         # print(f'convu1 res shape : {dec1.shape}')
         dec2 = self.layers['convu2'].forward(dec1, cres1)
+        np.get_default_memory_pool().free_all_blocks()
         # print(f'convu2 res shape : {dec2.shape}')
 
         out = self.layers['out'].forward(dec2)
+        np.get_default_memory_pool().free_all_blocks()
         # print(f'out res shape : {out.shape}')
         return sigmoid(out)
 
@@ -300,7 +332,7 @@ class SimpleConvNet:
         y = self.predict(x)
         return self.last_layer.forward(y, t)
 
-    def accuracy(self, x, t, batch_size=100):
+    def accuracy(self, x, t, batch_size=10):
         total_iou = 0
         total_batches = 0
 
@@ -334,6 +366,7 @@ class SimpleConvNet:
       """Compute the gradient using backpropagation."""
       # Forward pass to calculate the loss
       self.loss(x, t)
+      np.get_default_memory_pool().free_all_blocks()
       dout = self.last_layer.backward(1)
 
       # Reverse the layers for backward propagation
@@ -364,7 +397,7 @@ class SimpleConvNet:
           else:
               # Regular backward for other layers
               dout = layer.backward(dout)
-
+      np.get_default_memory_pool().free_all_blocks()
       # Collect gradients
       grads = {}
       for name, layer in self.layers.items():
