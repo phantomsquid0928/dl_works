@@ -153,9 +153,15 @@ class Down:
         #     print(f'dout shape {dout.shape}')
         #     # If add=True, sum the current dout and saved_dout element-wise
         #     dout += self.saved_dout  # Element-wise addition, dimensions must match
-        dout = self.pool.backward(dout)  # Max pooling's backward
-        dout += dout2
-        dout = self.double_conv.backward(dout)  # Backprop through double conv
+        dout1 = self.pool.backward(dout)  # Max pooling's backward
+        del(dout)
+        np.get_default_memory_pool().free_all_blocks()
+        dout1 += dout2
+        del(dout2)
+        np.get_default_memory_pool().free_all_blocks()
+        dout = self.double_conv.backward(dout1)  # Backprop through double conv
+        del(dout1)
+        np.get_default_memory_pool().free_all_blocks()
         return dout
 
     # def save_dout(self, dout):
@@ -204,10 +210,15 @@ class Up:
         self.double_conv = DoubleConv(W1, b1, W2, b2, stride, pad)
         self.x2 = False
     def forward(self, x1, x2=None):
-        x1 = self.up.forward(x1)
+        x1_out = self.up.forward(x1)
+        del(x1)
+        np.get_default_memory_pool().free_all_blocks()
         if x2 is not None:
             # print(f'before concat size x1 x2 - x1 : {x1.shape} ,  x2 :  {x2.shape}')
-            x1 = self.concat.forward(x1, x2)
+            x1 = self.concat.forward(x1_out, x2)
+            del(x2)
+            del(x1_out)
+            np.get_default_memory_pool().free_all_blocks()
             self.x2 = True
         return self.double_conv.forward(x1)
 
@@ -215,10 +226,14 @@ class Up:
         dout = self.double_conv.backward(dout)
         if self.x2 is True:
             dout_x1, dout_x2 = self.concat.backward(dout)
-            dout_x1 = self.up.backward(dout_x1)
+            del(dout)
+            np.get_default_memory_pool().free_all_blocks()
+            dout_x1_back = self.up.backward(dout_x1)
+            del(dout_x1)
+            np.get_default_memory_pool().free_all_blocks()
             # print(f'shape dout_x1{dout_x1.shape}')
             # print(f'shape dout_x2{dout_x2.shape}')
-            return dout_x1, dout_x2
+            return dout_x1_back, dout_x2
         return dout
 
     @property
@@ -296,6 +311,11 @@ class SimpleConvNet:
                     self.layers[name] = Up(W1, b1, W2, b2)
                 elif 'conv' in name:
                     self.layers[name] = DoubleConv(W1, b1, W2, b2)
+                
+                self.params[f'gamma1_{name}'] = self.layers[name].double_conv.bn1.batch_norm_layer.gamma
+                self.params[f'beta1_{name}'] = self.layers[name].double_conv.bn1.batch_norm_layer.beta
+                self.params[f'gamma2_{name}'] = self.layers[name].double_conv.bn2.batch_norm_layer.gamma
+                self.params[f'beta2_{name}'] = self.layers[name].double_conv.bn2.batch_norm_layer.beta
 
             input_size = cur_pool_output_size
 
@@ -304,23 +324,29 @@ class SimpleConvNet:
 
     def forward(self, x):
         enc1, cres1 = self.layers['convd1'].forward(x)
+        del(x)
         np.get_default_memory_pool().free_all_blocks()
         # print(f'convd1 res shape : {enc1.shape}   - saved shape : {cres1.shape}')
         enc2, cres2 = self.layers['convd2'].forward(enc1)
+        del(enc1)
         np.get_default_memory_pool().free_all_blocks()
         # print(f'convd2 res shape : {enc2.shape}     - saved shape : {cres2.shape}')
         enc3 = self.layers['conv3'].forward(enc2)
+        del(enc2)
         np.get_default_memory_pool().free_all_blocks()
         # print(f'conv3 res shape : {enc3.shape}')
 
         dec1 = self.layers['convu1'].forward(enc3, cres2)
+        del(enc3, cres2)
         np.get_default_memory_pool().free_all_blocks()
         # print(f'convu1 res shape : {dec1.shape}')
         dec2 = self.layers['convu2'].forward(dec1, cres1)
+        del(dec1, cres1)
         np.get_default_memory_pool().free_all_blocks()
         # print(f'convu2 res shape : {dec2.shape}')
 
         out = self.layers['out'].forward(dec2)
+        del(dec2)
         np.get_default_memory_pool().free_all_blocks()
         # print(f'out res shape : {out.shape}')
         return sigmoid(out)
