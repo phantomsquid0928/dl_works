@@ -208,7 +208,12 @@ class Down:
     @property
     def dbeta2(self):
         return self.double_conv.dbeta2
-
+    @property
+    def bn1(self):
+        return self.double_conv.bn1
+    @property
+    def bn2(self):
+        return self.double_conv.bn2
 
 class Up:
     """Upsample followed by concatenation and Double Conv."""
@@ -275,6 +280,12 @@ class Up:
     @property
     def dbeta2(self):
         return self.double_conv.dbeta2
+    @property
+    def bn1(self):
+        return self.double_conv.bn1
+    @property
+    def bn2(self):
+        return self.double_conv.bn2
 
 class SimpleConvNet:
     def __init__(self, input_dim=(3, 256, 256), output_size=2, weight_init_std=0.01):
@@ -477,6 +488,9 @@ class SimpleConvNet:
                 if hasattr(layer, 'bn2'):  # In case there's a second BN layer (for double convs)
                     params[f'gamma2_{key}'] = layer.bn2.batch_norm_layer.gamma
                     params[f'beta2_{key}'] = layer.bn2.batch_norm_layer.beta
+            elif isinstance(layer, (Convolution)):
+                params[f'W_{key}'] = layer.W
+                params[f'b_{key}'] = layer.b
 
         with open(file_name, 'wb') as f:
             pickle.dump(params, f)
