@@ -307,15 +307,23 @@ class SimpleConvNet:
 
                 if 'convd' in name:
                     self.layers[name] = Down(W1, b1, W2, b2)
+                    self.params[f'gamma1_{name}'] = self.layers[name].double_conv.bn1.batch_norm_layer.gamma
+                    self.params[f'beta1_{name}'] = self.layers[name].double_conv.bn1.batch_norm_layer.beta
+                    self.params[f'gamma2_{name}'] = self.layers[name].double_conv.bn2.batch_norm_layer.gamma
+                    self.params[f'beta2_{name}'] = self.layers[name].double_conv.bn2.batch_norm_layer.beta
                 elif 'convu' in name:
                     self.layers[name] = Up(W1, b1, W2, b2)
+                    self.params[f'gamma1_{name}'] = self.layers[name].double_conv.bn1.batch_norm_layer.gamma
+                    self.params[f'beta1_{name}'] = self.layers[name].double_conv.bn1.batch_norm_layer.beta
+                    self.params[f'gamma2_{name}'] = self.layers[name].double_conv.bn2.batch_norm_layer.gamma
+                    self.params[f'beta2_{name}'] = self.layers[name].double_conv.bn2.batch_norm_layer.beta
                 elif 'conv' in name:
                     self.layers[name] = DoubleConv(W1, b1, W2, b2)
+                    self.params[f'gamma1_{name}'] = self.layers[name].bn1.batch_norm_layer.gamma
+                    self.params[f'beta1_{name}'] = self.layers[name].bn1.batch_norm_layer.beta
+                    self.params[f'gamma2_{name}'] = self.layers[name].bn2.batch_norm_layer.gamma
+                    self.params[f'beta2_{name}'] = self.layers[name].bn2.batch_norm_layer.beta
                 
-                self.params[f'gamma1_{name}'] = self.layers[name].double_conv.bn1.batch_norm_layer.gamma
-                self.params[f'beta1_{name}'] = self.layers[name].double_conv.bn1.batch_norm_layer.beta
-                self.params[f'gamma2_{name}'] = self.layers[name].double_conv.bn2.batch_norm_layer.gamma
-                self.params[f'beta2_{name}'] = self.layers[name].double_conv.bn2.batch_norm_layer.beta
 
             input_size = cur_pool_output_size
 
