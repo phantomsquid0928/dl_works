@@ -69,6 +69,7 @@ class Trainer:
     def train(self):
         for i in range(self.max_iter):
             self.train_step()
+            np.get_default_memory_pool().free_all_blocks()
 
         test_acc = self.network.accuracy(self.x_test, self.t_test)
 
