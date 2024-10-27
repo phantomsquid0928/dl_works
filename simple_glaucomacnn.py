@@ -388,9 +388,6 @@ class SimpleConvNet:
 
       return grads
 
-class SimpleConvNet:
-    # Other methods and initialization as before...
-
     def save_params(self, file_name="params.pkl"):
         """ Save the model parameters into a pickle file """
         params = {}
