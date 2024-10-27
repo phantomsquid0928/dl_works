@@ -212,6 +212,19 @@ class Down:
     @property
     def bn2(self):
         return self.double_conv.bn2
+    @property
+    def W1(self):
+        return self.double_conv.conv1.W
+    @property
+    def W2(self):
+        return self.double_conv.conv2.W
+    @property
+    def b1(self):
+        return self.double_conv.conv1.b
+    @property
+    def b2(self):
+        return self.double_conv.conv2.b
+
 
 class Up:
     """Upsample followed by concatenation and Double Conv."""
@@ -285,6 +298,18 @@ class Up:
     @property
     def bn2(self):
         return self.double_conv.bn2
+    @property
+    def W1(self):
+        return self.double_conv.conv1.W
+    @property
+    def W2(self):
+        return self.double_conv.conv2.W
+    @property
+    def b1(self):
+        return self.double_conv.conv1.b
+    @property
+    def b2(self):
+        return self.double_conv.conv2.b
 
 class SimpleConvNet:
     def __init__(self, input_dim=(3, 256, 256), output_size=2, weight_init_std=0.01):
@@ -492,11 +517,16 @@ class SimpleConvNet:
         # Add BatchNorm parameters to params
         for key, layer in self.layers.items():
             if isinstance(layer, (Down, Up, DoubleConv)):
+                params[f'W1_{key}'] = layer.conv1.W
+                params[f'b1_{key}'] = layer.conv1.b
+                params[f'W2_{key}'] = layer.conv2.W
+                params[f'b1_{key}'] = layer.conv2.b
+            
                 params[f'gamma1_{key}'] = layer.bn1.batch_norm_layer.gamma
                 params[f'beta1_{key}'] = layer.bn1.batch_norm_layer.beta
-                if hasattr(layer, 'bn2'):  # In case there's a second BN layer (for double convs)
-                    params[f'gamma2_{key}'] = layer.bn2.batch_norm_layer.gamma
-                    params[f'beta2_{key}'] = layer.bn2.batch_norm_layer.beta
+                # if hasattr(layer, 'bn2'):  # In case there's a second BN layer (for double convs)
+                params[f'gamma2_{key}'] = layer.bn2.batch_norm_layer.gamma
+                params[f'beta2_{key}'] = layer.bn2.batch_norm_layer.beta
             elif isinstance(layer, (Convolution)):
                 params[f'W_{key}'] = layer.W
                 params[f'b_{key}'] = layer.b
@@ -517,17 +547,17 @@ class SimpleConvNet:
         for key, layer in self.layers.items():
             if isinstance(layer, (Down, Up, DoubleConv)):  # Layers with weights
                 layer.W1 = self.params[f'W1_{key}']
-                layer.b1 = self.params[f'b1_{key}']
-                if hasattr(layer, 'W2'):
-                    layer.W2 = self.params[f'W2_{key}']
-                    layer.b2 = self.params[f'b2_{key}']
+                layer.W1 = self.params[f'b1_{key}']
+            
+                layer.W2 = self.params[f'W2_{key}']
+                layer.b2 = self.params[f'b2_{key}']
                 
                 # Load BatchNorm parameters
                 layer.bn1.batch_norm_layer.gamma = self.params[f'gamma1_{key}']
                 layer.bn1.batch_norm_layer.beta = self.params[f'beta1_{key}']
-                if hasattr(layer, 'bn2'):
-                    layer.bn2.batch_norm_layer.gamma = self.params[f'gamma2_{key}']
-                    layer.bn2.batch_norm_layer.beta = self.params[f'beta2_{key}']
+                # if hasattr(layer, 'bn2'):
+                layer.bn2.batch_norm_layer.gamma = self.params[f'gamma2_{key}']
+                layer.bn2.batch_norm_layer.beta = self.params[f'beta2_{key}']
             elif isinstance(layer, Convolution):  # For the 'out' layer
                 layer.W = self.params[f'W_{key}']
                 layer.b = self.params[f'b_{key}']
