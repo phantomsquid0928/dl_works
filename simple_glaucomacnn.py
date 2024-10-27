@@ -301,32 +301,42 @@ class SimpleConvNet:
         return self.last_layer.forward(y, t)
 
     def accuracy(self, x, t, batch_size=100):
-        total_iou = 0
+        total_iou_od = 0  # For optic disc
+        total_iou_oc = 0  # For optic cup
         total_batches = 0
 
         for i in range(0, x.shape[0], batch_size):
             print(f'acc assess {i}...')
-            x_batch = x[i:i+batch_size]
-            t_batch = t[i:i+batch_size]
+            x_batch = x[i:i + batch_size]
+            t_batch = t[i:i + batch_size]
 
             # Get predictions for the batch
             y_batch = self.predict(x_batch)
 
-            # Threshold to get binary predictions (0 or 1)
+            # Threshold to get binary predictions (0 or 1) for both channels
             y_bin = (y_batch > 0.5).astype(np.float32)
             t_bin = t_batch.astype(np.float32)
 
-            # Calculate IoU for the batch
-            intersection = np.sum((y_bin == 1) & (t_bin == 1))  # True positives
-            union = np.sum((y_bin == 1) | (t_bin == 1))         # True positives + False positives + False negatives
+            # Optic disc IoU (first channel)
+            intersection_od = np.sum((y_bin[:, 0] == 1) & (t_bin[:, 0] == 1))  # True positives
+            union_od = np.sum((y_bin[:, 0] == 1) | (t_bin[:, 0] == 1))         # True positives + False positives + False negatives
+            iou_od = intersection_od / (union_od + 1e-7)
 
-            iou = intersection / (union + 1e-7)  # Adding a small epsilon to avoid division by zero
-            total_iou += iou
+            # Optic cup IoU (second channel)
+            intersection_oc = np.sum((y_bin[:, 1] == 1) & (t_bin[:, 1] == 1))  # True positives
+            union_oc = np.sum((y_bin[:, 1] == 1) | (t_bin[:, 1] == 1))         # True positives + False positives + False negatives
+            iou_oc = intersection_oc / (union_oc + 1e-7)
+
+            total_iou_od += iou_od
+            total_iou_oc += iou_oc
             total_batches += 1
 
-        # Return average IoU over all batches
-        avg_iou = total_iou / total_batches
+        # Return average IoU for both optic disc and optic cup
+        avg_iou_od = total_iou_od / total_batches
+        avg_iou_oc = total_iou_oc / total_batches
+        avg_iou = (avg_iou_od + avg_iou_oc) / 2.0  # Average over both classes
         return avg_iou
+
 
 
 
