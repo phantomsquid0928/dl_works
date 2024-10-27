@@ -1,9 +1,9 @@
+import cupy as np  # Use CuPy
 import os
 import cv2
-import cupy as np
 
 class GlaucomaDataset:
-    def __init__(self, root_dirs, split='train', output_size=(128, 128), thresh=0.6):  # Changed default output_size to (128, 128)
+    def __init__(self, root_dirs, split='train', output_size=(256, 256), thresh=0.6):
         self.output_size = output_size
         self.split = split
         self.images = []
@@ -25,11 +25,11 @@ class GlaucomaDataset:
                 img_name = os.path.join(direct, "Images_Square", self.image_filenames[k])
                 img = cv2.imread(img_name)  # Read image
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
-                img = cv2.resize(img, self.output_size)  # Resize image to half the size
+                img = cv2.resize(img, self.output_size)  # Resize image
                 img = img.astype(np.float32) / 255.0  # Normalize image to [0, 1]
                 
-                img = np.transpose(img, (2, 0, 1))  # Change to channel-first format (C, H, W)
-                self.images.append(img)
+                img = np.transpose(img, (2, 0, 1))
+                self.images.append(np.asarray(img))  # Convert NumPy array to CuPy array
 
                 # If not in test split, load segmentation masks
                 if split != 'test':
@@ -37,29 +37,13 @@ class GlaucomaDataset:
                     mask = cv2.imread(seg_name, cv2.IMREAD_GRAYSCALE)  # Load mask as grayscale
                     od = (mask == 1).astype(np.float32)  # Optic disc mask
                     oc = (mask == 2).astype(np.float32)  # Optic cup mask
-                    od = cv2.resize(od, self.output_size, interpolation=cv2.INTER_NEAREST)  # Resize to half the size
-                    oc = cv2.resize(oc, self.output_size, interpolation=cv2.INTER_NEAREST)  # Resize to half the size
-                    self.segs.append(np.stack([od, oc], axis=0))  # Stack the masks
-                    
+                    od = cv2.resize(od, self.output_size, interpolation=cv2.INTER_NEAREST)
+                    oc = cv2.resize(oc, self.output_size, interpolation=cv2.INTER_NEAREST)
+
+                    # Convert to CuPy array before stacking
+                    od_cupy = np.asarray(od)
+                    oc_cupy = np.asarray(oc)
+
+                    self.segs.append(np.stack([od_cupy, oc_cupy], axis=0))  # Stack the masks
+
             print(f'Successfully loaded {split} dataset.')
-
-    def calculate_vCDR(self, od, oc):
-        """Calculate the vertical cup-to-disc ratio (vCDR) from the optic disc (od) and optic cup (oc) masks."""
-        # Find the vertical diameter (sum along the y-axis)
-        od_vertical_diameter = np.sum(od, axis=0).max()
-        oc_vertical_diameter = np.sum(oc, axis=0).max()
-
-        # Calculate the vertical cup-to-disc ratio
-        vCDR = oc_vertical_diameter / (od_vertical_diameter + 1e-7)  # Add a small value to avoid division by zero
-        return vCDR
-    
-    def __len__(self):
-        return len(self.images)
-
-    def __getitem__(self, idx):
-        img = self.images[idx]
-        if self.split == 'test':
-            return img
-        else:
-            seg = self.segs[idx]
-            return img, seg
