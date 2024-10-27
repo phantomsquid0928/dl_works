@@ -1,5 +1,5 @@
 # coding: utf-8
-import numpy as np
+import cupy as np
 from common.functions import *
 from common.util import im2col, col2im
 

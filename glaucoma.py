@@ -1,6 +1,6 @@
 import os
 import cv2
-import numpy as np
+import cupy as np
 
 class GlaucomaDataset:
     def __init__(self, root_dirs, split='train', output_size=(128, 128), thresh=0.6):  # Changed default output_size to (128, 128)
