@@ -140,6 +140,19 @@ class DoubleConv:
     @property
     def dbeta2(self):
         return self.bn2.dbeta
+    
+    @property
+    def W1(self):
+        return self.conv1.W
+    @property
+    def W2(self):
+        return self.conv2.W
+    @property
+    def b1(self):
+        return self.conv1.b
+    @property
+    def b2(self):
+        return self.conv2.b
 
 class Down:
     """Double Conv followed by Max Pooling for downsampling."""
@@ -517,10 +530,10 @@ class SimpleConvNet:
         # Add BatchNorm parameters to params
         for key, layer in self.layers.items():
             if isinstance(layer, (Down, Up, DoubleConv)):
-                params[f'W1_{key}'] = layer.conv1.W
-                params[f'b1_{key}'] = layer.conv1.b
-                params[f'W2_{key}'] = layer.conv2.W
-                params[f'b1_{key}'] = layer.conv2.b
+                params[f'W1_{key}'] = layer.W1
+                params[f'b1_{key}'] = layer.b1
+                params[f'W2_{key}'] = layer.W2
+                params[f'b2_{key}'] = layer.b2
             
                 params[f'gamma1_{key}'] = layer.bn1.batch_norm_layer.gamma
                 params[f'beta1_{key}'] = layer.bn1.batch_norm_layer.beta
