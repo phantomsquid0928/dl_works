@@ -292,6 +292,7 @@ class SimpleConvNet:
 
         out = self.layers['out'].forward(dec2)
         # print(f'out res shape : {out.shape}')
+        print(f"Model output range (before sigmoid): min={out.min()}, max={out.max()}")
         return sigmoid(out)
 
     def predict(self, x):
