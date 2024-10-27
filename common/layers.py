@@ -286,21 +286,16 @@ class Pooling:
 ## BCE binary cross entropy loss, may cause err
 
 class BCELoss:
-    def __init__(self):
-        self.loss = None
-        self.y = None  # Predicted output
-        self.t = None  # True labels (segmentation masks)
-
-    def forward(self, y, t):
-        self.y = y
-        self.t = t
-        epsilon = 1e-7  # Small value to prevent log(0)
-        # Binary Cross-Entropy Loss
-        self.loss = -np.mean(t * np.log(y + epsilon) + (1 - t) * np.log(1 - y + epsilon))
-        return self.loss
-
+    def forward(self, predictions, targets):
+        # Store predictions and targets for backward pass
+        self.predictions = 1 / (1 + np.exp(-predictions))  # Apply sigmoid here
+        self.targets = targets
+        
+        # Binary cross-entropy loss formula
+        loss = -np.mean(targets * np.log(self.predictions + 1e-7) + (1 - targets) * np.log(1 - self.predictions + 1e-7))
+        return loss
+    
     def backward(self, dout=1):
-        batch_size = self.t.shape[0]
-        dx = (self.y - self.t) / batch_size
+        # Backward pass for binary cross-entropy
+        dx = dout * (self.predictions - self.targets) / (self.predictions * (1 - self.predictions) + 1e-7)
         return dx
-

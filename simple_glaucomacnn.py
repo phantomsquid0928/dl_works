@@ -423,7 +423,8 @@ class SimpleConvNet:
         del(dec3)
         np.get_default_memory_pool().free_all_blocks()
         # print(f'out res shape : {out.shape}')
-        return sigmoid(out)
+        return out
+        # return sigmoid(out)
 
     def predict(self, x):
         return self.forward(x)
