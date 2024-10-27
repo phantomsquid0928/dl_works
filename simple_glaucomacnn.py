@@ -26,7 +26,15 @@ class BatchNormWrapper:
             return dout
         else:
             return self.batch_norm_layer.backward(dout)
+        
+    @property
+    def dgamma(self):
+        return self.batch_norm_layer.dgamma
 
+    @property
+    def dbeta(self):
+        return self.batch_norm_layer.dbeta
+    
 class Upsample:
     def __init__(self, scale_factor=2):
         self.scale_factor = scale_factor
