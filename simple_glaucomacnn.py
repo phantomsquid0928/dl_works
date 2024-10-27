@@ -142,7 +142,18 @@ class DoubleConv:
     @property
     def dbeta2(self):
         return self.bn2.dbeta
-
+    @property
+    def W1(self):
+        return self.conv1.W
+    @property
+    def W2(self):
+        return self.conv2.W
+    @property
+    def b1(self):
+        return self.conv1.b
+    @property
+    def b2(self):
+        return self.conv2.b
 class Down:
     """Double Conv followed by Max Pooling for downsampling."""
     def __init__(self, W1, b1, W2, b2, stride=1, pad=1):
