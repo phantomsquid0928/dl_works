@@ -532,6 +532,8 @@ class SimpleConvNet:
         with open(file_name, 'wb') as f:
             pickle.dump(params, f)
 
+            
+
     def load_params(self, file_name="params.pkl"):
         """ Load model parameters from a pickle file and assign to layers """
         with open(file_name, 'rb') as f:
@@ -543,19 +545,35 @@ class SimpleConvNet:
 
         # Assign the loaded weights, biases, and batchnorm params back to the corresponding layers
         for key, layer in self.layers.items():
-            if isinstance(layer, (Down, Up, DoubleConv)):  # Layers with weights
-                layer.W1 = self.params[f'W1_{key}']
-                layer.b1 = self.params[f'b1_{key}']
-                
-                layer.W2 = self.params[f'W2_{key}']
-                layer.b2 = self.params[f'b2_{key}']
-                
+            if isinstance(layer, (Down, Up)):  # Layers with double_conv attribute
+                # Assign to conv1 and conv2 inside double_conv
+                layer.double_conv.conv1.W = self.params[f'W1_{key}']
+                layer.double_conv.conv1.b = self.params[f'b1_{key}']
+                layer.double_conv.conv2.W = self.params[f'W2_{key}']
+                layer.double_conv.conv2.b = self.params[f'b2_{key}']
+
+                # Load BatchNorm parameters
+                layer.double_conv.bn1.batch_norm_layer.gamma = self.params[f'gamma1_{key}']
+                layer.double_conv.bn1.batch_norm_layer.beta = self.params[f'beta1_{key}']
+                if hasattr(layer.double_conv, 'bn2'):
+                    layer.double_conv.bn2.batch_norm_layer.gamma = self.params[f'gamma2_{key}']
+                    layer.double_conv.bn2.batch_norm_layer.beta = self.params[f'beta2_{key}']
+                    
+            elif isinstance(layer, DoubleConv):  # For standalone DoubleConv layers
+                # Assign to conv1 and conv2 directly
+                layer.conv1.W = self.params[f'W1_{key}']
+                layer.conv1.b = self.params[f'b1_{key}']
+                layer.conv2.W = self.params[f'W2_{key}']
+                layer.conv2.b = self.params[f'b2_{key}']
+
                 # Load BatchNorm parameters
                 layer.bn1.batch_norm_layer.gamma = self.params[f'gamma1_{key}']
                 layer.bn1.batch_norm_layer.beta = self.params[f'beta1_{key}']
-                
-                layer.bn2.batch_norm_layer.gamma = self.params[f'gamma2_{key}']
-                layer.bn2.batch_norm_layer.beta = self.params[f'beta2_{key}']
+                if hasattr(layer, 'bn2'):
+                    layer.bn2.batch_norm_layer.gamma = self.params[f'gamma2_{key}']
+                    layer.bn2.batch_norm_layer.beta = self.params[f'beta2_{key}']
+                    
             elif isinstance(layer, Convolution):  # For the 'out' layer
                 layer.W = self.params[f'W_{key}']
                 layer.b = self.params[f'b_{key}']
+
