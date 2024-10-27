@@ -248,14 +248,14 @@ class SimpleConvNet:
 
             if name == 'out':
                 # Only single convolution for output
-                W = weight_init_std * np.random.randn(vals['filter_out'], vals['filter_in'], vals['filter_size'], vals['filter_size'])
+                W = np.random.randn(vals['filter_out'], vals['filter_in'], vals['filter_size'], vals['filter_size']) * np.sqrt(2.0 / vals['filter_in'])
                 b = np.zeros(vals['filter_out'])
                 self.params[f'W_{name}'] = W
                 self.params[f'b_{name}'] = b
                 self.layers[name] = Convolution(W, b, vals['stride'], vals['pad'])
             else:
-                W1 = weight_init_std * np.random.randn(vals['filter_out'], vals['filter_in'], vals['filter_size'], vals['filter_size'])
-                W2 = weight_init_std * np.random.randn(vals['filter_out'], vals['filter_out'], vals['filter_size'], vals['filter_size'])
+                W1 = weight_init_std * np.random.randn(vals['filter_out'], vals['filter_in'], vals['filter_size'], vals['filter_size']) * np.sqrt(2.0 / vals['filter_in'])
+                W2 = weight_init_std * np.random.randn(vals['filter_out'], vals['filter_out'], vals['filter_size'], vals['filter_size']) * np.sqrt(2.0 / vals['filter_out'])
                 b1 = np.zeros(vals['filter_out'])
                 b2 = np.zeros(vals['filter_out'])
 
