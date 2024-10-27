@@ -26,7 +26,13 @@ class BatchNormWrapper:
             return dout
         else:
             return self.batch_norm_layer.backward(dout)
+    @property
+    def dgamma(self):
+        return self.batch_norm_layer.dgamma
 
+    @property
+    def dbeta(self):
+        return self.batch_norm_layer.dbeta
 class Upsample:
     def __init__(self, scale_factor=2):
         self.scale_factor = scale_factor
@@ -351,7 +357,7 @@ class SimpleConvNet:
         # print(f'conv4 res shape : {enc3.shape}')
 
         dec1 = self.layers['convu1'].forward(enc4, cres3)
-        del(enc3, cres3)
+        del(enc4, cres3)
         np.get_default_memory_pool().free_all_blocks()
 
         dec2 = self.layers['convu2'].forward(dec1, cres2)
