@@ -388,32 +388,48 @@ class SimpleConvNet:
 
       return grads
 
-def save_params(self, file_name="params.pkl"):
+    def save_params(self, file_name="params.pkl"):
         """ Save the model parameters into a pickle file """
         params = {}
         for key, val in self.params.items():
             params[key] = val
+        
+        # Add BatchNorm parameters to params
+        for key, layer in self.layers.items():
+            if isinstance(layer, (Down, Up, DoubleConv)):
+                params[f'gamma1_{key}'] = layer.bn1.batch_norm_layer.gamma
+                params[f'beta1_{key}'] = layer.bn1.batch_norm_layer.beta
+                if hasattr(layer, 'bn2'):  # In case there's a second BN layer (for double convs)
+                    params[f'gamma2_{key}'] = layer.bn2.batch_norm_layer.gamma
+                    params[f'beta2_{key}'] = layer.bn2.batch_norm_layer.beta
+
         with open(file_name, 'wb') as f:
             pickle.dump(params, f)
 
-def load_params(self, file_name="params.pkl"):
-    """ Load model parameters from a pickle file and assign to layers """
-    with open(file_name, 'rb') as f:
-        loaded_params = pickle.load(f)
+    def load_params(self, file_name="params.pkl"):
+        """ Load model parameters from a pickle file and assign to layers """
+        with open(file_name, 'rb') as f:
+            loaded_params = pickle.load(f)
 
-    # Update self.params with loaded parameters
-    for key, val in loaded_params.items():
-        self.params[key] = val
+        # Update self.params with loaded parameters
+        for key, val in loaded_params.items():
+            self.params[key] = val
 
-    # Assign the loaded weights and biases back to the corresponding layers
-    for key, layer in self.layers.items():
-        if isinstance(layer, (Down, Up, DoubleConv)):  # Layers with weights
-            layer.W1 = self.params[f'W1_{key}']
-            layer.b1 = self.params[f'b1_{key}']
-            # If there were second sets of weights (W2, b2), you could add that here too
-            if hasattr(layer, 'W2'):
-                layer.W2 = self.params[f'W2_{key}']
-                layer.b2 = self.params[f'b2_{key}']
-        elif isinstance(layer, Convolution):  # For the 'out' layer
-            layer.W = self.params[f'W_{key}']
-            layer.b = self.params[f'b_{key}']
+        # Assign the loaded weights, biases, and batchnorm params back to the corresponding layers
+        for key, layer in self.layers.items():
+            if isinstance(layer, (Down, Up, DoubleConv)):  # Layers with weights
+                layer.W1 = self.params[f'W1_{key}']
+                layer.b1 = self.params[f'b1_{key}']
+                if hasattr(layer, 'W2'):
+                    layer.W2 = self.params[f'W2_{key}']
+                    layer.b2 = self.params[f'b2_{key}']
+                
+                # Load BatchNorm parameters
+                layer.bn1.batch_norm_layer.gamma = self.params[f'gamma1_{key}']
+                layer.bn1.batch_norm_layer.beta = self.params[f'beta1_{key}']
+                if hasattr(layer, 'bn2'):
+                    layer.bn2.batch_norm_layer.gamma = self.params[f'gamma2_{key}']
+                    layer.bn2.batch_norm_layer.beta = self.params[f'beta2_{key}']
+            elif isinstance(layer, Convolution):  # For the 'out' layer
+                layer.W = self.params[f'W_{key}']
+                layer.b = self.params[f'b_{key}']
